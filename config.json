@@ -1,0 +1,30 @@
+{
+  "description": "Vault secrets plugin for Docker Swarm",
+  "documentation": "https://docs.docker.com/engine/extend/",
+  "interface": {
+    "types": ["docker.secretdriver/1.0"],
+    "socket": "vault-secrets-plugin.sock"
+  },
+  "entrypoint": ["./vault-secrets-plugin"],
+  "workdir": "/root",
+  "linux": {
+    "capabilities": ["CAP_SYS_ADMIN"]
+  },
+  "network": {
+    "type": "host"
+  },
+  "mounts": [
+    {
+      "source": "/var/run/docker.sock",
+      "destination": "/var/run/docker.sock",
+      "type": "bind",
+      "options": ["bind"]
+    }
+  ],
+  "env": [
+    {
+      "name": "VAULT_ADDR",
+      "description": "Vault server address"
+    }
+  ]
+}
