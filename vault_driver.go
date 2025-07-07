@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+	// "path/filepath"
 	"strings"
 	"time"
-
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/go-plugins-helpers/secrets"
 	"github.com/hashicorp/vault/api"
 )
@@ -87,98 +87,133 @@ func (d *VaultDriver) authenticate() error {
 			return fmt.Errorf("VAULT_TOKEN is required for token authentication")
 		}
 		d.client.SetToken(d.config.Token)
-		
+
 	case "approle":
 		if d.config.RoleID == "" || d.config.SecretID == "" {
 			return fmt.Errorf("VAULT_ROLE_ID and VAULT_SECRET_ID are required for approle authentication")
 		}
-		
+
 		data := map[string]interface{}{
 			"role_id":   d.config.RoleID,
 			"secret_id": d.config.SecretID,
 		}
-		
+
 		resp, err := d.client.Logical().Write("auth/approle/login", data)
 		if err != nil {
 			return fmt.Errorf("approle authentication failed: %v", err)
 		}
-		
+
 		if resp.Auth == nil {
 			return fmt.Errorf("no auth info returned from approle login")
 		}
-		
+
 		d.client.SetToken(resp.Auth.ClientToken)
-		
+
 	default:
 		return fmt.Errorf("unsupported authentication method: %s", d.config.AuthMethod)
 	}
-	
+
 	return nil
 }
 
-// Get implements the secrets.Driver interface
+// Update the Get method with better logging
 func (d *VaultDriver) Get(req secrets.Request) secrets.Response {
-	if req.SecretName == "" {
-		return secrets.Response{
-			Err: "secret name is required",
-		}
-	}
+    log.Printf("Received secret request for: %s", req.SecretName)
+    
+    if req.SecretName == "" {
+        return secrets.Response{
+            Err: "secret name is required",
+        }
+    }
 
-	// Build the secret path based on labels and service information
-	secretPath := d.buildSecretPath(req)
-	
-	// Add context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+    // Build the secret path based on labels and service information
+    secretPath := d.buildSecretPath(req)
+    log.Printf("Built secret path: %s", secretPath)
+    
+    // Add context with timeout
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
 
-	// Read secret from Vault
-	secret, err := d.client.Logical().ReadWithContext(ctx, secretPath)
-	if err != nil {
-		return secrets.Response{
-			Err: fmt.Sprintf("failed to read secret from vault: %v", err),
-		}
-	}
+    // Read secret from Vault
+    secret, err := d.client.Logical().ReadWithContext(ctx, secretPath)
+    if err != nil {
+        log.Printf("Error reading secret from vault: %v", err)
+        return secrets.Response{
+            Err: fmt.Sprintf("failed to read secret from vault: %v", err),
+        }
+    }
 
-	if secret == nil {
-		return secrets.Response{
-			Err: fmt.Sprintf("secret not found: %s", secretPath),
-		}
-	}
+    if secret == nil {
+        log.Printf("Secret not found at path: %s", secretPath)
+        return secrets.Response{
+            Err: fmt.Sprintf("secret not found at path: %s (verify the secret exists in Vault)", secretPath),
+        }
+    }
 
-	// Extract the secret value
-	value, err := d.extractSecretValue(secret, req)
-	if err != nil {
-		return secrets.Response{
-			Err: fmt.Sprintf("failed to extract secret value: %v", err),
-		}
-	}
+    log.Printf("Successfully read secret from vault")
+    
+    // Extract the secret value
+    value, err := d.extractSecretValue(secret, req)
+    if err != nil {
+        log.Printf("Error extracting secret value: %v", err)
+        return secrets.Response{
+            Err: fmt.Sprintf("failed to extract secret value: %v", err),
+        }
+    }
 
-	// Determine if secret should be reusable
-	doNotReuse := d.shouldNotReuse(req)
+    // Determine if secret should be reusable
+    doNotReuse := d.shouldNotReuse(req)
 
-	return secrets.Response{
-		Value:      value,
-		DoNotReuse: doNotReuse,
-	}
+    log.Printf("Successfully returning secret value")
+    return secrets.Response{
+        Value:      value,
+        DoNotReuse: doNotReuse,
+    }
 }
 
 // buildSecretPath constructs the Vault path for the secret
+// func (d *VaultDriver) buildSecretPath(req secrets.Request) string {
+// 	// Default path structure: {mount_path}/data/{service_name}/{secret_name}
+// 	basePath := fmt.Sprintf("%s/data", d.config.MountPath)
+
+// 	// Use custom path from labels if provided
+// 	if customPath, exists := req.SecretLabels["vault_path"]; exists {
+// 		return filepath.Join(basePath, customPath)
+// 	}
+
+// 	// Use service-based path
+// 	if req.ServiceName != "" {
+// 		return filepath.Join(basePath, req.ServiceName, req.SecretName)
+// 	}
+
+// 	// Fallback to direct secret name
+// 	return filepath.Join(basePath, req.SecretName)
+// }
+
+// buildSecretPath constructs the Vault path for the secret
 func (d *VaultDriver) buildSecretPath(req secrets.Request) string {
-	// Default path structure: {mount_path}/data/{service_name}/{secret_name}
-	basePath := fmt.Sprintf("%s/data", d.config.MountPath)
-	
 	// Use custom path from labels if provided
 	if customPath, exists := req.SecretLabels["vault_path"]; exists {
-		return filepath.Join(basePath, customPath)
+		// For KV v2, ensure we have the /data/ prefix
+		if d.config.MountPath == "secret" {
+			return fmt.Sprintf("%s/data/%s", d.config.MountPath, customPath)
+		}
+		return fmt.Sprintf("%s/%s", d.config.MountPath, customPath)
 	}
-	
-	// Use service-based path
+
+	// Default path structure for KV v2
+	if d.config.MountPath == "secret" {
+		if req.ServiceName != "" {
+			return fmt.Sprintf("%s/data/%s/%s", d.config.MountPath, req.ServiceName, req.SecretName)
+		}
+		return fmt.Sprintf("%s/data/%s", d.config.MountPath, req.SecretName)
+	}
+
+	// For other mount paths
 	if req.ServiceName != "" {
-		return filepath.Join(basePath, req.ServiceName, req.SecretName)
+		return fmt.Sprintf("%s/%s/%s", d.config.MountPath, req.ServiceName, req.SecretName)
 	}
-	
-	// Fallback to direct secret name
-	return filepath.Join(basePath, req.SecretName)
+	return fmt.Sprintf("%s/%s", d.config.MountPath, req.SecretName)
 }
 
 // extractSecretValue extracts the appropriate value from the Vault response
@@ -201,7 +236,7 @@ func (d *VaultDriver) extractSecretValue(secret *api.Secret, req secrets.Request
 
 	// Default field names to try
 	defaultFields := []string{"value", "password", "secret", "data"}
-	
+
 	// Try to find a value using default field names
 	for _, field := range defaultFields {
 		if value, ok := data[field]; ok {
@@ -225,14 +260,14 @@ func (d *VaultDriver) shouldNotReuse(req secrets.Request) bool {
 	if reuse, exists := req.SecretLabels["vault_reuse"]; exists {
 		return strings.ToLower(reuse) == "false"
 	}
-	
+
 	// Don't reuse dynamic secrets or certificates
-	if strings.Contains(req.SecretName, "cert") || 
-	   strings.Contains(req.SecretName, "token") ||
-	   strings.Contains(req.SecretName, "dynamic") {
+	if strings.Contains(req.SecretName, "cert") ||
+		strings.Contains(req.SecretName, "token") ||
+		strings.Contains(req.SecretName, "dynamic") {
 		return true
 	}
-	
+
 	return false
 }
 
