@@ -59,3 +59,11 @@ vault kv put secret/database/mysql \
 ```bash
 vault kv get secret/database/mysql 
 ```
+
+---
+debug the plugin 
+
+```bash
+sudo journalctl -u docker.service -f \
+  | grep plugin_id
+```

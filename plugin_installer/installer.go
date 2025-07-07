@@ -6,7 +6,7 @@ import (
 	"os"
 	"regexp"
 
-	// "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/swarm/runtime"
 	dockerclient "github.com/docker/docker/client"
@@ -18,11 +18,11 @@ var (
 )
 
 func main() {
-	cli, err := dockerclient.NewClientWithOpts()
+	cli, err := dockerclient.NewEnvClient()
 	if err != nil {
 		log.Fatalf("Error creating Docker client: %v", err)
 	}
-	serviceName := "vault-secrets-plugin-service"
+	serviceName := "vault-secrets-plugin"
 	pluginName := "sanjay7178/vault-secrets-plugin:latest"
 	if override, exists := os.LookupEnv("plugin_name"); exists {
 		pluginName = override
@@ -33,9 +33,6 @@ func main() {
 	if override, exists := os.LookupEnv("remote"); exists {
 		remote = override
 	}
-	// get current user ID and group ID
-	uid := os.Getuid()
-	logrus.Info("Using UID:", uid)
 	service, err := cli.ServiceCreate(context.Background(), swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
 			Name: serviceName,
@@ -54,7 +51,7 @@ func main() {
 					{
 						Name:        "mount",
 						Description: "host path to mount",
-						Value:       []string{"/run/user/docker.sock"},
+						Value:       []string{"/var/run/docker.sock"},
 					},
 					{
 						Name:        "capabilities",
@@ -63,6 +60,8 @@ func main() {
 					},
 				},
 				Env: []string{
+					"policy-template={{ .ServiceName }},{{ .TaskImage }},{{ ServiceLabel \"com.docker.ucp.access.label\" }}",
+					"DOCKER_API_VERSION=1.37",
 					"VAULT_ADDR=https://152.53.244.80:8200",
 					"VAULT_AUTH_METHOD=approle",
 					"VAULT_ROLE_ID=8ff294a6-9d5c-c5bb-b494-bc0bfe02a97e",
@@ -76,14 +75,9 @@ func main() {
 			},
 			Runtime: swarm.RuntimePlugin,
 		},
-	}, swarm.ServiceCreateOptions{})
+	}, types.ServiceCreateOptions{})
 	if err != nil {
 		log.Fatalf("Failed to create plugin service: %v", err)
 	}
-	// print plugin status 
-	if service.ID == "" {
-		log.Fatalf("Failed to create plugin service: service ID is empty")
-	}
-	fmt.Println("Plugin service created successfully with ID:")
 	fmt.Println(service.ID)
 }

@@ -2,7 +2,7 @@
   "description": "Vault secrets plugin for Docker Swarm",
   "documentation": "https://docs.docker.com/engine/extend/",
   "interface": {
-    "types": ["docker.secretdriver/1.0"],
+    "types": ["docker.secretdriver/1.0","docker.secretprovider/1.0"],
     "socket": "plugin.sock"
   },
   "entrypoint": ["./vault-secrets-plugin"],

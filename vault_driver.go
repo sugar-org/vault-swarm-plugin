@@ -34,8 +34,9 @@ type VaultConfig struct {
 // NewVaultDriver creates a new VaultDriver instance
 func NewVaultDriver() (*VaultDriver, error) {
 	config := &VaultConfig{
-		Address:    getEnvOrDefault("VAULT_ADDR", "https://vault.service.consul:8200"),
-		Token:      os.Getenv("VAULT_TOKEN"),
+		Address:    getEnvOrDefault("VAULT_ADDR", "http://152.53.244.80:8200"),
+		// Token:      os.Getenv("VAULT_TOKEN"),
+		Token: 	getEnvOrDefault("VAULT_TOKEN", "hvs.tD053xbJ1C5lo2EbtZnn2JU8"), // Use environment variable for token
 		MountPath:  getEnvOrDefault("VAULT_MOUNT_PATH", "secret"),
 		RoleID:     os.Getenv("VAULT_ROLE_ID"),
 		SecretID:   os.Getenv("VAULT_SECRET_ID"),
@@ -74,6 +75,8 @@ func NewVaultDriver() (*VaultDriver, error) {
 	// Authenticate with Vault
 	if err := driver.authenticate(); err != nil {
 		return nil, fmt.Errorf("failed to authenticate with vault: %v", err)
+	}else{
+		log.Printf("Successfully authenticated with Vault using %s method", config.AuthMethod)
 	}
 
 	return driver, nil
@@ -159,7 +162,9 @@ func (d *VaultDriver) Get(req secrets.Request) secrets.Response {
         return secrets.Response{
             Err: fmt.Sprintf("failed to extract secret value: %v", err),
         }
-    }
+    }else{
+		log.Printf("Extracted secret value successfully")
+	}
 
     // Determine if secret should be reusable
     doNotReuse := d.shouldNotReuse(req)
@@ -170,27 +175,7 @@ func (d *VaultDriver) Get(req secrets.Request) secrets.Response {
         DoNotReuse: doNotReuse,
     }
 }
-
-// buildSecretPath constructs the Vault path for the secret
-// func (d *VaultDriver) buildSecretPath(req secrets.Request) string {
-// 	// Default path structure: {mount_path}/data/{service_name}/{secret_name}
-// 	basePath := fmt.Sprintf("%s/data", d.config.MountPath)
-
-// 	// Use custom path from labels if provided
-// 	if customPath, exists := req.SecretLabels["vault_path"]; exists {
-// 		return filepath.Join(basePath, customPath)
-// 	}
-
-// 	// Use service-based path
-// 	if req.ServiceName != "" {
-// 		return filepath.Join(basePath, req.ServiceName, req.SecretName)
-// 	}
-
-// 	// Fallback to direct secret name
-// 	return filepath.Join(basePath, req.SecretName)
-// }
-
-// buildSecretPath constructs the Vault path for the secret
+// buildSecretPath constructs the Vault secret path based on request labels and service information
 func (d *VaultDriver) buildSecretPath(req secrets.Request) string {
 	// Use custom path from labels if provided
 	if customPath, exists := req.SecretLabels["vault_path"]; exists {

@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+    fmt.Print("Starting Vault Secrets Provider...")
     var (
         flVersion = flag.Bool("version", false, "Print version")
         flDebug   = flag.Bool("debug", false, "Enable debug logging")
@@ -18,7 +19,6 @@ func main() {
         fmt.Println("Vault Secrets Provider v1.0.0")
         return
     }
-
     if *flDebug {
         log.SetLevel(log.DebugLevel)
     }
