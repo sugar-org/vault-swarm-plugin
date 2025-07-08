@@ -1,4 +1,52 @@
-#### vault server setup
+### Vault Swarm Plugin
+
+A Docker Swarm secrets plugin that integrates with HashiCorp Vault for secure secret management.
+
+## Features
+
+- **Vault Integration**: Retrieve secrets from HashiCorp Vault
+- **Multiple Auth Methods**: Support for token and AppRole authentication
+- **Automatic Secret Rotation**: Monitor Vault for changes and automatically update Docker secrets and services
+- **Flexible Path Mapping**: Customize Vault paths and field extraction
+- **Production Ready**: Includes proper error handling, logging, and cleanup
+
+## New: Automatic Secret Rotation
+
+The plugin now automatically monitors secrets in Vault and updates Docker Swarm secrets and services when changes are detected. See [ROTATION.md](ROTATION.md) for detailed documentation.
+
+### Quick Example
+```bash
+# Enable rotation with 2-minute check interval
+docker plugin set vault-secrets-plugin:latest \
+    VAULT_ENABLE_ROTATION="true" \
+    VAULT_ROTATION_INTERVAL="2m"
+```
+
+## Installation
+
+1. Build and enable the plugin:
+   ```bash
+   ./build.sh
+   ```
+
+2. Configure the plugin:
+   ```bash
+   docker plugin set vault-secrets-plugin:latest \
+       VAULT_ADDR="https://your-vault-server:8200" \
+       VAULT_AUTH_METHOD="token" \
+       VAULT_TOKEN="your-vault-token" \
+       VAULT_ENABLE_ROTATION="true"
+   ```
+
+3. Use in docker-compose.yml:
+   ```yaml
+   secrets:
+     mysql_password:
+       driver: vault-secrets-plugin:latest
+       labels:
+         vault_path: "database/mysql"
+         vault_field: "password"
+   ```
 start the server
 ```bash
 vault server -dev

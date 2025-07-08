@@ -46,7 +46,9 @@ docker plugin set vault-secrets-plugin:latest \
     VAULT_ADDR="https://152.53.244.80:8200" \
     VAULT_AUTH_METHOD="token" \
     VAULT_TOKEN="hvs.tD053xbJ1C5lo2EbtZnn2JU8" \
-    VAULT_MOUNT_PATH="secret"
+    VAULT_MOUNT_PATH="secret" \
+    VAULT_ENABLE_ROTATION="true" \
+    VAULT_ROTATION_INTERVAL="2m"
 
 # export VAULT_ROLE_ID="8ff294a6-9d5c-c5bb-b494-bc0bfe02a97e"
 # export VAULT_SECRET_ID="aedde801-0616-18a5-a62d-c6d7eb483cff"
