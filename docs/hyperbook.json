@@ -1,0 +1,11 @@
+{
+  "name": "Vault Swarm Plugin",
+  "version": "0.0.0",
+  "description": "A Docker Swarm secrets plugin that integrates with HashiCorp Vault for secure secret management.",
+  "license": "cc0",
+  "author": {
+    "name": "Sai Sanjay",
+    "url": "https://sugar-org.github.io/sugar"
+  },
+  "language": "en"
+}
