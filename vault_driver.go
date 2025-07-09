@@ -541,7 +541,7 @@ func (d *VaultDriver) updateDockerSecret(secretName string, newValue []byte) err
 	log.Printf("Created new version of secret %s with name %s and ID: %s", secretName, newSecretName, createResponse.ID)
 	
 	// Update all services that use this secret to point to the new version
-	if err := d.updateServicesSecretReference(secretName, newSecretName); err != nil {
+	if err := d.updateServicesSecretReference(secretName, newSecretName, createResponse.ID); err != nil {
 		// If we can't update services, remove the new secret and return error
 		d.dockerClient.SecretRemove(ctx, createResponse.ID)
 		return fmt.Errorf("failed to update services to use new secret: %v", err)
@@ -557,7 +557,7 @@ func (d *VaultDriver) updateDockerSecret(secretName string, newValue []byte) err
 }
 
 // updateServicesSecretReference updates all services to use the new secret version
-func (d *VaultDriver) updateServicesSecretReference(oldSecretName, newSecretName string) error {
+func (d *VaultDriver) updateServicesSecretReference(oldSecretName, newSecretName, newSecretID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	
@@ -576,10 +576,10 @@ func (d *VaultDriver) updateServicesSecretReference(oldSecretName, newSecretName
 		
 		for i, secretRef := range service.Spec.TaskTemplate.ContainerSpec.Secrets {
 			if secretRef.SecretName == oldSecretName {
-				// Update to use the new secret name
+				// Update to use the new secret name and ID
 				updatedSecrets[i] = &swarm.SecretReference{
 					File:       secretRef.File,
-					SecretID:   newSecretName, // Use new secret name as ID
+					SecretID:   newSecretID,   // Use actual Docker secret ID
 					SecretName: newSecretName,
 				}
 				needsUpdate = true
