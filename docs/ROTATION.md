@@ -27,6 +27,11 @@ The following environment variables control the rotation behavior:
 ### Example Configuration
 
 ```bash
+docker plugin install vault-secrets-plugin:latest
+
+```
+
+```bash
 # Enable rotation with 2-minute check interval
 docker plugin set vault-secrets-plugin:latest \
     VAULT_ENABLE_ROTATION="true" \
