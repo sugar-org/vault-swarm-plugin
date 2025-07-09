@@ -10,7 +10,7 @@ docker plugin rm vault-secrets-plugin:temp --force 2>/dev/null || true
 docker plugin rm vault-secrets-plugin:latest --force 2>/dev/null || true
 
 echo -e "${RED}Build the plugin${DEF}"
-docker build -t vault-secrets-plugin:temp .
+docker build -t vault-secrets-plugin:temp ../
 
 echo -e "${RED}Create plugin rootfs${DEF}"
 mkdir -p ./plugin/rootfs
@@ -20,7 +20,7 @@ docker rm temp-container
 docker rmi vault-secrets-plugin:temp
 
 echo -e "${RED}Copy config to plugin directory${DEF}"
-cp config.json ./plugin/
+cp ../config.json ./plugin/
 
 echo -e "${RED}Create the plugin${DEF}"
 docker plugin create vault-secrets-plugin:temp ./plugin

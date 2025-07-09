@@ -10,7 +10,7 @@ docker plugin disable vault-secrets-plugin:latest --force 2>/dev/null || true
 docker plugin rm vault-secrets-plugin:latest --force 2>/dev/null || true
 
 echo -e ${DEF}Build the plugin
-docker build -t vault-secrets-plugin:temp .
+docker build -t vault-secrets-plugin:temp ../
 
 echo -e ${DEF}Create plugin rootfs
 mkdir -p ./plugin/rootfs
@@ -20,7 +20,7 @@ docker rm temp-container
 docker rmi vault-secrets-plugin:temp
 
 echo -e ${DEF}Copy config to plugin directory
-cp config.json ./plugin/
+cp ../config.json ./plugin/
 
 # go run plugin_installer/installer.go
 
@@ -67,7 +67,7 @@ echo "- secret/database/mysql (with root_password and user_password fields)"
 docker node ls --filter role=worker -q | wc -l | grep -q 0 && snitch_role=manager || snitch_role=worker
 export snitch_role
 echo -e ${DEF}Deploy the stack
-docker stack deploy -c docker-compose.yml myapp
+docker stack deploy -c ../docker-compose.yml myapp
 
 echo -e ${DEF}Verify the deployment
 docker stack services myapp

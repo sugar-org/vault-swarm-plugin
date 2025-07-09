@@ -12,7 +12,7 @@ docker plugin disable sanjay7178/vault-secrets-plugin:latest --force 2>/dev/null
 docker plugin rm sanjay7178/vault-secrets-plugin:latest --force 2>/dev/null || true
 
 echo -e "${DEF}Build the plugin${DEF}"
-docker build -t vault-secrets-plugin:temp .
+docker build -t vault-secrets-plugin:temp ../
 
 echo -e "${DEF}Create plugin rootfs${DEF}"
 mkdir -p ./plugin/rootfs
@@ -22,7 +22,7 @@ docker rm temp-container
 docker rmi vault-secrets-plugin:temp
 
 echo -e "${DEF}Copy config to plugin directory${DEF}"
-cp config.json ./plugin/
+cp ../config.json ./plugin/
 
 echo -e "${DEF}Create the plugin${DEF}"
 docker plugin create sanjay7178/vault-secrets-plugin:latest ./plugin
