@@ -1,0 +1,77 @@
+var i18n = (function () {
+  
+  // GENERATED
+  const locales = {
+    "footnote-label": "Footnotes",
+    "footnote-back-label": "Back to reference {{index}}",
+    "footnote-back-label-many": "Back to reference {{from}}-{{to}}",
+    "store-different-origin": "The Hyperbook file is from a different origin {{origin}}. Do you want to import it anyways?",
+    "store-import-successful": "The Hyperbook file has been imported successfully.",
+    "store-not-supported-file-version": "The Hyperbook file has an unsupported version {{version}}.",
+    "store-reset-successful": "The Hyberbook has been reset successfully.",
+    "store-reset-confirm": "Are you sure you want to reset the Hyperbook? This will remove all your data.",
+    "shell-search": "Search",
+    "shell-toggle-dark-mode": "Toggle between Dark and Light Mode",
+    "shell-reset-hyperbook": "Reset Hyperbook",
+    "shell-import-hyperbook": "Import Hyperbook from a file",
+    "shell-export-hyperbook": "Export Hyperbook to a file",
+    "qr-code": "QR Code",
+    "p5-update": "Update",
+    "p5-code-preview": "Code Preview",
+    "p5-reset": "Reset",
+    "p5-copy": "Copy",
+    "p5-download": "Download",
+    "abc-music-reset": "Reset",
+    "abc-music-copy": "Copy",
+    "abc-music-download": "Download",
+    "table-of-contents": "Table of Contents",
+    "audio-play": "Play/Pause",
+    "archive-offline": "Offline",
+    "download-offline": "Offline",
+    "pyide-run": "Run",
+    "pyide-running-click-to-stop": "Running (Click to stop) ...",
+    "pyide-running-refresh-to-stop": "Running (Refresh to stop) ...",
+    "pyide-test": "Test",
+    "pyide-test-running-click-to-stop": "Test running (Click to stop) ...",
+    "pyide-test-running-refresh-to-stop": "Test running (Refresh to stop) ...",
+    "pyide-output": "Output",
+    "pyide-input": "Input",
+    "pyide-reset": "Reset",
+    "pyide-copy": "Copy",
+    "pyide-download": "Download",
+    "slideshow-previous": "Previous",
+    "slideshow-next": "Next",
+    "slideshow-jump-to": "Jump to {{index}}",
+    "toggle-bookmark": "Toggle Bookmark",
+    "webide-code-preview": "Code Preview",
+    "webide-html": "HTML",
+    "webide-css": "CSS",
+    "webide-js": "JS",
+    "webide-reset": "Reset",
+    "webide-reset-prompt": "Are you sure you want to reset the code?",
+    "webide-copy": "Copy",
+    "webide-download": "Download"
+}
+;
+
+
+  const get = (key, values) => {
+    if (!locales[key]) {
+      console.warn(
+        `Missing translation for key '${key}'`
+      );
+      return key;
+    }
+
+    let translation = locales[key];
+    if (values) {
+      for (const [key, value] of Object.entries(values)) {
+        translation = translation.replace(`{{${key}}}`, value);
+      }
+    }
+
+    return translation;
+  };
+
+  return { get };
+})();
