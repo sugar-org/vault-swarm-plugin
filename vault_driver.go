@@ -482,15 +482,9 @@ func (d *VaultDriver) rotateSecret(secretInfo *SecretInfo) error {
 		return fmt.Errorf("field %s not found in secret", secretInfo.VaultField)
 	}
 	
-	// Update Docker secret
+	// Update Docker secret (this now handles service updates internally)
 	if err := d.updateDockerSecret(secretInfo.DockerSecretName, newValue); err != nil {
 		return fmt.Errorf("failed to update docker secret: %v", err)
-	}
-	
-	// Update services that use this secret
-	if err := d.updateServicesUsingSecret(secretInfo); err != nil {
-		log.Errorf("Failed to update some services using secret %s: %v", secretInfo.DockerSecretName, err)
-		// Don't return error here as the secret was updated successfully
 	}
 	
 	// Update tracking information
@@ -526,10 +520,13 @@ func (d *VaultDriver) updateDockerSecret(secretName string, newValue []byte) err
 		return fmt.Errorf("secret %s not found", secretName)
 	}
 	
-	// Create new secret with same labels but updated value
+	// Generate a unique name for the new secret version
+	newSecretName := fmt.Sprintf("%s-%d", secretName, time.Now().Unix())
+	
+	// Create new secret with versioned name and same labels but updated value
 	newSecretSpec := swarm.SecretSpec{
 		Annotations: swarm.Annotations{
-			Name:   secretName,
+			Name:   newSecretName,
 			Labels: existingSecret.Spec.Labels,
 		},
 		Data: newValue,
@@ -541,12 +538,83 @@ func (d *VaultDriver) updateDockerSecret(secretName string, newValue []byte) err
 		return fmt.Errorf("failed to create new secret version: %v", err)
 	}
 	
-	log.Printf("Created new version of secret %s with ID: %s", secretName, createResponse.ID)
+	log.Printf("Created new version of secret %s with name %s and ID: %s", secretName, newSecretName, createResponse.ID)
 	
-	// Remove the old secret (Docker will automatically update services)
+	// Update all services that use this secret to point to the new version
+	if err := d.updateServicesSecretReference(secretName, newSecretName); err != nil {
+		// If we can't update services, remove the new secret and return error
+		d.dockerClient.SecretRemove(ctx, createResponse.ID)
+		return fmt.Errorf("failed to update services to use new secret: %v", err)
+	}
+	
+	// Remove the old secret only after services are updated
 	if err := d.dockerClient.SecretRemove(ctx, existingSecret.ID); err != nil {
 		log.Warnf("Failed to remove old secret version %s: %v", existingSecret.ID, err)
-		// Don't return error as the new secret was created successfully
+		// Don't return error as the new secret was created and services updated successfully
+	}
+	
+	return nil
+}
+
+// updateServicesSecretReference updates all services to use the new secret version
+func (d *VaultDriver) updateServicesSecretReference(oldSecretName, newSecretName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	
+	// List all services
+	services, err := d.dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list services: %v", err)
+	}
+	
+	var updatedServices []string
+	
+	for _, service := range services {
+		// Check if service uses this secret and update the reference
+		needsUpdate := false
+		updatedSecrets := make([]*swarm.SecretReference, len(service.Spec.TaskTemplate.ContainerSpec.Secrets))
+		
+		for i, secretRef := range service.Spec.TaskTemplate.ContainerSpec.Secrets {
+			if secretRef.SecretName == oldSecretName {
+				// Update to use the new secret name
+				updatedSecrets[i] = &swarm.SecretReference{
+					File:       secretRef.File,
+					SecretID:   newSecretName, // Use new secret name as ID
+					SecretName: newSecretName,
+				}
+				needsUpdate = true
+			} else {
+				updatedSecrets[i] = secretRef
+			}
+		}
+		
+		if needsUpdate {
+			// Update service with new secret references
+			serviceSpec := service.Spec
+			serviceSpec.TaskTemplate.ContainerSpec.Secrets = updatedSecrets
+			
+			// Add/update a label to force the update
+			if serviceSpec.Labels == nil {
+				serviceSpec.Labels = make(map[string]string)
+			}
+			serviceSpec.Labels["vault.secret.rotated"] = fmt.Sprintf("%d", time.Now().Unix())
+			
+			updateOptions := types.ServiceUpdateOptions{}
+			updateResponse, err := d.dockerClient.ServiceUpdate(ctx, service.ID, service.Version, serviceSpec, updateOptions)
+			if err != nil {
+				return fmt.Errorf("failed to update service %s: %v", service.Spec.Name, err)
+			}
+			
+			if len(updateResponse.Warnings) > 0 {
+				log.Warnf("Service update warnings for %s: %v", service.Spec.Name, updateResponse.Warnings)
+			}
+			
+			updatedServices = append(updatedServices, service.Spec.Name)
+		}
+	}
+	
+	if len(updatedServices) > 0 {
+		log.Printf("Updated services to use new secret %s: %v", newSecretName, updatedServices)
 	}
 	
 	return nil
