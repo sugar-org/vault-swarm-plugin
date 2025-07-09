@@ -48,6 +48,16 @@
       "settable": ["value"]
     },
     {
+      "name": "VAULT_ENABLE_ROTATION",
+      "description": "Enable automatic secret rotation (true/false)",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_ROTATION_INTERVAL",
+      "description": "Secret rotation check interval (e.g., 5m, 1h)",
+      "settable": ["value"]
+    },
+    {
       "name": "uid",
       "description": "User ID to run the plugin as",
       "settable": ["value"]

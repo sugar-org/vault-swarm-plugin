@@ -3,6 +3,9 @@ package main
 import (
     "flag"
     "fmt"
+    "os"
+    "os/signal"
+    "syscall"
     log "github.com/sirupsen/logrus"
     "github.com/docker/go-plugins-helpers/secrets"
 )
@@ -28,6 +31,20 @@ func main() {
     if err != nil {
         log.Fatalf("Failed to initialize vault driver: %v", err)
     }
+
+    // Set up signal handling for graceful shutdown
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    
+    // Start cleanup goroutine
+    go func() {
+        <-sigChan
+        log.Println("Received shutdown signal, cleaning up...")
+        if err := driver.Stop(); err != nil {
+            log.Errorf("Error during cleanup: %v", err)
+        }
+        os.Exit(0)
+    }()
 
     // Create the plugin handler
     handler := secrets.NewHandler(driver)
