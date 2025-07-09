@@ -25,10 +25,16 @@ services:
     image: busybox:latest
     command: >
       sh -c "
-        echo ' Root password:' && cat /run/secrets/mysql_root_password
-        echo ' MySQL password:' && cat /run/secrets/mysql_password
-        echo 'Sleeping to keep container running...'
-        sleep 3600
+      while true; do
+        echo 'Waiting for secrets to be available...'
+        if [ -f /run/secrets/mysql_root_password ] && [ -f /run/secrets/mysql_password ]; then
+        echo 'Secrets are available!'
+        cat /run/secrets/mysql_root_password
+        echo '\n'
+        cat /run/secrets/mysql_password
+        fi
+        sleep 5
+      done
       "
     secrets:
       # - source: mysql_root_password

@@ -67,7 +67,7 @@ func NewVaultDriver() (*VaultDriver, error) {
 		ClientCert: os.Getenv("VAULT_CLIENT_CERT"),
 		ClientKey:  os.Getenv("VAULT_CLIENT_KEY"),
 		EnableRotation: getEnvOrDefault("VAULT_ENABLE_ROTATION", "true") == "true",
-		RotationInterval: parseDurationOrDefault(getEnvOrDefault("VAULT_ROTATION_INTERVAL", "5m")),
+		RotationInterval: parseDurationOrDefault(getEnvOrDefault("VAULT_ROTATION_INTERVAL", "10s")),
 	}
 
 	// Configure Vault client

@@ -48,7 +48,7 @@ docker plugin set vault-secrets-plugin:latest \
     VAULT_TOKEN="hvs.tD053xbJ1C5lo2EbtZnn2JU8" \
     VAULT_MOUNT_PATH="secret" \
     VAULT_ENABLE_ROTATION="true" \
-    VAULT_ROTATION_INTERVAL="2m"
+    VAULT_ROTATION_INTERVAL="5s"
 
 # export VAULT_ROLE_ID="8ff294a6-9d5c-c5bb-b494-bc0bfe02a97e"
 # export VAULT_SECRET_ID="aedde801-0616-18a5-a62d-c6d7eb483cff"
@@ -73,4 +73,5 @@ echo -e ${DEF}Verify the deployment
 docker stack services myapp
 
 echo -e ${DEF}Check the logs of the service
-docker service logs myapp_busybox
+sleep 5
+docker service logs -f myapp_busybox

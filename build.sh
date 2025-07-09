@@ -45,9 +45,9 @@ echo -e "You can now use this plugin with: docker plugin install sanjay7178/vaul
 
 
 # Important: Enable the plugin before pushing
-echo -e "${DEF}Enable the plugin${DEF}"
-docker plugin enable sanjay7178/vault-secrets-plugin:latest
+# echo -e "${DEF}Enable the plugin${DEF}"
+# docker plugin enable sanjay7178/vault-secrets-plugin:latest
 
-# Set privileges if needed
-echo -e "${DEF}Setting plugin permissions${DEF}"
-docker plugin set sanjay7178/vault-secrets-plugin:latest gid=0 uid=0 || echo "Skipping permission setting (plugin may already be enabled)"
+# # Set privileges if needed
+# echo -e "${DEF}Setting plugin permissions${DEF}"
+# docker plugin set sanjay7178/vault-secrets-plugin:latest gid=0 uid=0 || echo "Skipping permission setting (plugin may already be enabled)"
