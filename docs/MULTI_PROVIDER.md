@@ -1,3 +1,7 @@
+---
+name: Multi-Provider Configuration Guide
+---
+
 # Multi-Provider Configuration Guide
 
 The Vault Swarm Plugin now supports multiple secrets providers, allowing you to use different backends for secret management while maintaining the same Docker Swarm secrets interface.

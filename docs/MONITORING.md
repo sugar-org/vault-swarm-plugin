@@ -1,3 +1,7 @@
+---
+name: Monitoring and Performance Guide 
+----
+
 # Monitoring and Performance Guide
 
 The Vault Swarm Plugin includes comprehensive monitoring capabilities to track system performance, secret rotation activity, and overall health.
