@@ -10,7 +10,7 @@ docker plugin disable vault-secrets-plugin:latest --force 2>/dev/null || true
 docker plugin rm vault-secrets-plugin:latest --force 2>/dev/null || true
 
 echo -e ${DEF}Build the plugin
-docker build -t vault-secrets-plugin:temp ../
+docker build  -f Dockerfile -t vault-secrets-plugin:temp .
 
 echo -e ${DEF}Create plugin rootfs
 mkdir -p ./plugin/rootfs
@@ -20,7 +20,7 @@ docker rm temp-container
 docker rmi vault-secrets-plugin:temp
 
 echo -e ${DEF}Copy config to plugin directory
-cp ../config.json ./plugin/
+cp config.json ./plugin/
 
 # go run plugin_installer/installer.go
 
@@ -48,7 +48,9 @@ docker plugin set vault-secrets-plugin:latest \
     VAULT_TOKEN="hvs.tD053xbJ1C5lo2EbtZnn2JU8" \
     VAULT_MOUNT_PATH="secret" \
     VAULT_ENABLE_ROTATION="true" \
-    VAULT_ROTATION_INTERVAL="5s"
+    VAULT_ROTATION_INTERVAL="5s" \
+    ENABLE_MONITORING="true" \
+    MONITORING_PORT="8080"
 
 # export VAULT_ROLE_ID="8ff294a6-9d5c-c5bb-b494-bc0bfe02a97e"
 # export VAULT_SECRET_ID="aedde801-0616-18a5-a62d-c6d7eb483cff"
@@ -67,7 +69,7 @@ echo "- secret/database/mysql (with root_password and user_password fields)"
 docker node ls --filter role=worker -q | wc -l | grep -q 0 && snitch_role=manager || snitch_role=worker
 export snitch_role
 echo -e ${DEF}Deploy the stack
-docker stack deploy -c ../docker-compose.yml myapp
+docker stack deploy -c docker-compose.yml myapp
 
 echo -e ${DEF}Verify the deployment
 docker stack services myapp

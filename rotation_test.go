@@ -4,16 +4,22 @@ import (
 	"testing"
 	"time"
 	"github.com/docker/go-plugins-helpers/secrets"
+	"swarm-vault/providers"
 )
 
 func TestSecretTracking(t *testing.T) {
+	// Create a mock provider
+	mockProvider := &providers.VaultProvider{}
+	
 	// Create a mock VaultDriver for testing
 	driver := &VaultDriver{
+		provider: mockProvider,
 		config: &VaultConfig{
+			ProviderType:     "vault",
 			EnableRotation:   true,
 			RotationInterval: 1 * time.Minute,
 		},
-		secretTracker: make(map[string]*SecretInfo),
+		secretTracker: make(map[string]*providers.SecretInfo),
 	}
 
 	// Mock a secret request
@@ -26,11 +32,10 @@ func TestSecretTracking(t *testing.T) {
 		},
 	}
 
-	vaultPath := "secret/data/database/mysql"
 	secretValue := []byte("test-password")
 
 	// Test secret tracking
-	driver.trackSecret(req, vaultPath, secretValue)
+	driver.trackSecret(req, secretValue)
 
 	// Check if secret is tracked
 	if len(driver.secretTracker) != 1 {
@@ -46,18 +51,18 @@ func TestSecretTracking(t *testing.T) {
 		t.Errorf("Expected secret name 'test-secret', got '%s'", secretInfo.DockerSecretName)
 	}
 
-	if secretInfo.VaultPath != vaultPath {
-		t.Errorf("Expected vault path '%s', got '%s'", vaultPath, secretInfo.VaultPath)
+	if secretInfo.SecretPath != "secret/data/database/mysql" {
+		t.Errorf("Expected secret path 'secret/data/database/mysql', got '%s'", secretInfo.SecretPath)
 	}
 
-	if secretInfo.VaultField != "password" {
-		t.Errorf("Expected vault field 'password', got '%s'", secretInfo.VaultField)
+	if secretInfo.SecretField != "password" {
+		t.Errorf("Expected secret field 'password', got '%s'", secretInfo.SecretField)
 	}
 
 	// Test adding same secret with different service
 	req2 := req
 	req2.ServiceName = "another-service"
-	driver.trackSecret(req2, vaultPath, secretValue)
+	driver.trackSecret(req2, secretValue)
 
 	// Should still have 1 secret but with 2 services
 	if len(driver.secretTracker) != 1 {

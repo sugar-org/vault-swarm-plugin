@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 	"github.com/docker/go-plugins-helpers/secrets"
+	"swarm-vault/providers"
 )
 
 // MockVaultClient simulates a Vault client for testing
@@ -28,13 +29,18 @@ func (m *MockVaultClient) getSecret(path string) string {
 }
 
 func TestSecretRotationWorkflow(t *testing.T) {
+	// Create a mock provider
+	mockProvider := &providers.VaultProvider{}
+	
 	// Create a driver with tracking enabled
 	driver := &VaultDriver{
+		provider: mockProvider,
 		config: &VaultConfig{
+			ProviderType:     "vault",
 			EnableRotation:   true,
 			RotationInterval: 100 * time.Millisecond, // Fast interval for testing
 		},
-		secretTracker: make(map[string]*SecretInfo),
+		secretTracker: make(map[string]*providers.SecretInfo),
 	}
 
 	// Mock initial secret request
@@ -48,10 +54,9 @@ func TestSecretRotationWorkflow(t *testing.T) {
 	}
 
 	initialValue := []byte("initial-secret-value")
-	vaultPath := "secret/data/app/config"
 
 	// Track the initial secret
-	driver.trackSecret(req, vaultPath, initialValue)
+	driver.trackSecret(req, initialValue)
 
 	// Verify tracking
 	if len(driver.secretTracker) != 1 {
@@ -84,7 +89,7 @@ func TestSecretRotationWorkflow(t *testing.T) {
 	// Test service tracking for multiple services
 	req2 := req
 	req2.ServiceName = "api-service"
-	driver.trackSecret(req2, vaultPath, initialValue)
+	driver.trackSecret(req2, initialValue)
 
 	// Should still have 1 secret but with 2 services
 	if len(driver.secretTracker) != 1 {
@@ -196,12 +201,17 @@ func BenchmarkHashCalculation(b *testing.B) {
 }
 
 func BenchmarkSecretTracking(b *testing.B) {
+	// Create a mock provider
+	mockProvider := &providers.VaultProvider{}
+	
 	driver := &VaultDriver{
+		provider: mockProvider,
 		config: &VaultConfig{
+			ProviderType:     "vault",
 			EnableRotation:   true,
 			RotationInterval: 1 * time.Minute,
 		},
-		secretTracker: make(map[string]*SecretInfo),
+		secretTracker: make(map[string]*providers.SecretInfo),
 	}
 
 	req := secrets.Request{
@@ -214,11 +224,10 @@ func BenchmarkSecretTracking(b *testing.B) {
 	}
 
 	value := []byte("benchmark-secret-value")
-	vaultPath := "secret/data/bench/test"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req.SecretName = fmt.Sprintf("secret-%d", i)
-		driver.trackSecret(req, vaultPath, value)
+		driver.trackSecret(req, value)
 	}
 }
