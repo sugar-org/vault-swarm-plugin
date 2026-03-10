@@ -124,6 +124,7 @@
       "settable": ["value"]
     },
     {
+<<<<<<< HEAD
       "name": "OPENBAO_APPROLE_AUTH_PATH",
       "description": "OpenBao AppRole auth mount path",
       "settable": ["value"]
@@ -149,6 +150,8 @@
       "settable": ["value"]
     },
     {
+=======
+>>>>>>> f58cd55 (resolved requested changes)
       "name": "OPENBAO_AUTH_METHOD",
       "description": "OpenBao authentication method",
       "settable": ["value"]
@@ -254,6 +257,7 @@
       "settable": ["value"]
     },
     {
+<<<<<<< HEAD
       "name": "PLUGIN_LOG_PATH",
       "description": "Path for plugin file logs (default /run/swarm-external-secrets/plugin.log)",
       "settable": ["value"]
@@ -261,19 +265,31 @@
     {
       "name": "LOG_LEVEL",
       "description": "Log level (debug, info, warn, error), default info",
+=======
+      "name": "uid",
+      "description": "User ID to run the plugin as",
+      "name": "USE_WEBHOOK",
+      "description": "Enable webhook-based secret sync for Vault provider (true/false, default false). When true, the plugin listens for HCP Vault Secrets push events instead of polling. Only effective with SECRETS_PROVIDER=vault.",
+>>>>>>> f58cd55 (resolved requested changes)
       "settable": ["value"]
     },
     {
+      "name": "gid",
+      "description": "Group ID to run the plugin as",
       "name": "WEBHOOK_PORT",
       "description": "Port for the webhook HTTP listener (default 9095). Only used when USE_WEBHOOK=true.",
       "settable": ["value"]
     },
     {
+      "name":"VAULT_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for Vault (true/false)",
       "name": "WEBHOOK_SECRET",
       "description": "HMAC shared secret for validating HCP Vault Secrets webhook signatures (X-HCP-Webhook-Signature). Optional but recommended. Only used when USE_WEBHOOK=true.",
       "settable": ["value"]
     },
     {
+      "name": "OPENBAO_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for OpenBao (true/false)",
       "name": "uid",
       "description": "User ID to run the plugin as",
       "settable": ["value"]

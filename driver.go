@@ -34,6 +34,7 @@ type SecretsDriver struct {
 	monitorCancel context.CancelFunc
 	monitor       *monitoring.Monitor
 	webInterface  *monitoring.WebInterface
+	webhookServer *providers.WebhookServer
 }
 
 // SecretsConfig holds the configuration for the multi-provider driver
@@ -44,6 +45,9 @@ type SecretsConfig struct {
 	EnableMonitoring bool
 	MonitoringPort   int
 	Settings         map[string]string
+	UseWebhook       bool
+	WebhookPort      int
+	WebhookSecret    string
 }
 
 // NewDriver creates a new Driver instance with multi-provider support
@@ -69,6 +73,9 @@ func NewDriver() (*SecretsDriver, error) {
 		EnableMonitoring: utils.GetEnvOrDefault("ENABLE_MONITORING", "true") == "true",
 		MonitoringPort:   utils.ParseIntOrDefault(utils.GetEnvOrDefault("MONITORING_PORT", "8080")),
 		Settings:         settings,
+		UseWebhook:       utils.GetEnvOrDefault("USE_WEBHOOK", "false") == "true",
+		WebhookPort:      utils.ParseIntOrDefault(utils.GetEnvOrDefault("WEBHOOK_PORT", "9095")),
+		WebhookSecret:    os.Getenv("WEBHOOK_SECRET"),
 	}
 
 	// Create the appropriate provider
@@ -116,14 +123,9 @@ func NewDriver() (*SecretsDriver, error) {
 		}
 	}
 
-	// Start monitoring if rotation is enabled and provider supports it
-	if config.EnableRotation && provider.SupportsRotation() {
-		log.Infof("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
-	// Webhook vs Ticker decision
-	// USE_WEBHOOK=true is only honoured for the Vault provider.
-	// All other providers (AWS, Azure, OpenBao, GCP) always use the ticker.
-	if config.UseWebhook && config.ProviderType == "vault" {
-		log.Printf("USE_WEBHOOK=true detected for Vault provider — starting webhook server on port %d", config.WebhookPort)
+	// Start webhook or ticker reconciliation if rotation is enabled and the provider supports it.
+	if config.EnableRotation && provider.SupportsRotation() && config.UseWebhook && config.ProviderType == "vault" {
+		log.Printf("USE_WEBHOOK=true detected for Vault provider; starting webhook server on port %d", config.WebhookPort)
 		webhookCfg := &providers.WebhookConfig{
 			Port:   config.WebhookPort,
 			Secret: config.WebhookSecret,
@@ -135,9 +137,8 @@ func NewDriver() (*SecretsDriver, error) {
 			}
 		}()
 	} else if config.EnableRotation && provider.SupportsRotation() {
-		// Existing ticker path — unchanged
 		if config.UseWebhook && config.ProviderType != "vault" {
-			log.Printf("USE_WEBHOOK=true is ignored for provider %s — falling back to ticker", config.ProviderType)
+			log.Printf("USE_WEBHOOK=true is ignored for provider %s; falling back to ticker", config.ProviderType)
 		}
 		log.Printf("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
 		go driver.startMonitoring()
@@ -259,6 +260,37 @@ func (d *SecretsDriver) shouldNotReuse(req secrets.Request) bool {
 	}
 
 	return false
+}
+
+// ReconcileSecret is used by the webhook path to reconcile tracked secrets
+// without waiting for the ticker interval.
+func (d *SecretsDriver) ReconcileSecret(secretName string) error {
+	d.trackerMutex.RLock()
+	secretInfo, exists := d.secretTracker[secretName]
+	if !exists {
+		for trackedName, trackedSecret := range d.secretTracker {
+			if strings.HasSuffix(trackedSecret.SecretPath, "/"+secretName) {
+				secretName = trackedName
+				secretInfo = trackedSecret
+				exists = true
+				break
+			}
+		}
+	}
+	d.trackerMutex.RUnlock()
+
+	if !exists {
+		log.Printf("webhook: secret %q is not currently tracked, skipping", secretName)
+		return nil
+	}
+
+	if !d.hasSecretChanged(secretInfo) {
+		log.Debugf("webhook: secret %q is already up to date", secretName)
+		return nil
+	}
+
+	d.handleSecretRotationResult(secretName, secretInfo)
+	return nil
 }
 
 // trackSecret adds or updates a secret in the tracking system
@@ -590,6 +622,36 @@ func (d *SecretsDriver) applyServiceSecretUpdate(
 	return nil
 }
 
+// forceServiceUpdate forces a service to update (recreate tasks)
+// TODO - This method is currently not used, check later if needed
+// func (d *SecretsDriver) forceServiceUpdate(service swarm.Service) error {
+// 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// 	defer cancel()
+
+// 	// Get current service spec
+// 	serviceSpec := service.Spec
+
+// 	// Add/update a label to force the update
+// 	if serviceSpec.Labels == nil {
+// 		serviceSpec.Labels = make(map[string]string)
+// 	}
+// 	serviceSpec.Labels["vault.secret.rotated"] = fmt.Sprintf("%d", time.Now().Unix())
+
+// 	// Update the service
+// 	updateOptions := types.ServiceUpdateOptions{}
+// 	updateResponse, err := d.dockerClient.ServiceUpdate(ctx, service.ID, service.Version, serviceSpec, updateOptions)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to update service: %v", err)
+// 	}
+
+// 	if len(updateResponse.Warnings) > 0 {
+// 		log.Warnf("Service update warnings for %s: %v", service.Spec.Name, updateResponse.Warnings)
+// 	}
+
+//		log.Printf("Forced update for service: %s", service.Spec.Name)
+//		return nil
+//	}
+//
 // Stop gracefully stops the monitoring and cleans up resources
 func (d *SecretsDriver) Stop() error {
 	if d.monitorCancel != nil {
@@ -603,6 +665,12 @@ func (d *SecretsDriver) Stop() error {
 	if d.webInterface != nil {
 		if err := d.webInterface.Stop(); err != nil {
 			log.Warnf("Error stopping web interface: %v", err)
+		}
+	}
+
+	if d.webhookServer != nil {
+		if err := d.webhookServer.Stop(); err != nil {
+			log.Warnf("Error stopping webhook server: %v", err)
 		}
 	}
 
