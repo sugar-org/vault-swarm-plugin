@@ -94,11 +94,6 @@
       "settable": ["value"]
     },
     {
-      "name": "VAULT_SKIP_VERIFY",
-      "description": "Skip TLS certificate verification for Vault (true/false)",
-      "settable": ["value"]
-    },
-    {
       "name": "SECRETS_PROVIDER",
       "description": "Secrets provider type (e.g., vault, openbao)",
       "settable": ["value"]
@@ -124,7 +119,6 @@
       "settable": ["value"]
     },
     {
-<<<<<<< HEAD
       "name": "OPENBAO_APPROLE_AUTH_PATH",
       "description": "OpenBao AppRole auth mount path",
       "settable": ["value"]
@@ -150,13 +144,6 @@
       "settable": ["value"]
     },
     {
-=======
->>>>>>> f58cd55 (resolved requested changes)
-      "name": "OPENBAO_AUTH_METHOD",
-      "description": "OpenBao authentication method",
-      "settable": ["value"]
-    },
-    {
       "name": "OPENBAO_TOKEN",
       "description": "OpenBao authentication token",
       "settable": ["value"]
@@ -167,18 +154,13 @@
       "settable": ["value"]
     },
     {
-      "name": "OPENBAO_SKIP_VERIFY",
-      "description": "Skip TLS certificate verification for OpenBao (true/false)",
-      "settable": ["value"]
-    },
-    {
       "name": "ENABLE_ROTATION",
       "description": "Enable automatic secret rotation (true/false)",
       "settable": ["value"]
     },
     {
       "name": "ROTATION_INTERVAL",
-      "description": "Secret rotation check interval (e.g., 5m, 1h)",
+      "description": "OpenBao secret rotation check interval (e.g., 5m, 1h)",
       "settable": ["value"]
     },
     {
@@ -227,22 +209,22 @@
       "settable": ["value"]
     },
     {
-      "name": "AZURE_ACCESS_TOKEN",
+      "name" : "AZURE_ACCESS_TOKEN",
       "description": "Azure access token for Key Vault",
       "settable": ["value"]
     },
     {
-      "name": "GCP_PROJECT_ID",
+      "name" : "GCP_PROJECT_ID",
       "description": "GCP project ID",
       "settable": ["value"]
     },
     {
-      "name": "GOOGLE_APPLICATION_CREDENTIALS",
+      "name" : "GOOGLE_APPLICATION_CREDENTIALS",
       "description": "Google application credentials required for GCP Secrets manager",
       "settable": ["value"]
     },
     {
-      "name": "GCP_CREDENTIALS_JSON",
+      "name" : "GCP_CREDENTIALS_JSON",
       "description": "Google credentials json required for GCP Secrets manager",
       "settable": ["value"]
     },
@@ -257,7 +239,6 @@
       "settable": ["value"]
     },
     {
-<<<<<<< HEAD
       "name": "PLUGIN_LOG_PATH",
       "description": "Path for plugin file logs (default /run/swarm-external-secrets/plugin.log)",
       "settable": ["value"]
@@ -265,31 +246,24 @@
     {
       "name": "LOG_LEVEL",
       "description": "Log level (debug, info, warn, error), default info",
-=======
-      "name": "uid",
-      "description": "User ID to run the plugin as",
-      "name": "USE_WEBHOOK",
-      "description": "Enable webhook-based secret sync for Vault provider (true/false, default false). When true, the plugin listens for HCP Vault Secrets push events instead of polling. Only effective with SECRETS_PROVIDER=vault.",
->>>>>>> f58cd55 (resolved requested changes)
       "settable": ["value"]
     },
     {
-      "name": "gid",
-      "description": "Group ID to run the plugin as",
+      "name": "USE_WEBHOOK",
+      "description": "Enable webhook-based secret sync for Vault provider (true/false, default false). When true, the plugin listens for HCP Vault Secrets push events instead of polling. Only effective with SECRETS_PROVIDER=vault.",
+      "settable": ["value"]
+    },
+    {
       "name": "WEBHOOK_PORT",
       "description": "Port for the webhook HTTP listener (default 9095). Only used when USE_WEBHOOK=true.",
       "settable": ["value"]
     },
     {
-      "name":"VAULT_SKIP_VERIFY",
-      "description": "Skip TLS certificate verification for Vault (true/false)",
       "name": "WEBHOOK_SECRET",
       "description": "HMAC shared secret for validating HCP Vault Secrets webhook signatures (X-HCP-Webhook-Signature). Optional but recommended. Only used when USE_WEBHOOK=true.",
       "settable": ["value"]
     },
     {
-      "name": "OPENBAO_SKIP_VERIFY",
-      "description": "Skip TLS certificate verification for OpenBao (true/false)",
       "name": "uid",
       "description": "User ID to run the plugin as",
       "settable": ["value"]
@@ -297,6 +271,16 @@
     {
       "name": "gid",
       "description": "Group ID to run the plugin as",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for Vault (true/false)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for OpenBao (true/false)",
       "settable": ["value"]
     }
   ]
