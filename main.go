@@ -2,17 +2,51 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
 )
 
+func configureLogLevel(debugFlag bool) {
+	// Default to InfoLevel; allow override via LOG_LEVEL (0-6) or --debug.
+	log.SetLevel(log.InfoLevel)
+
+	if lvlStr, ok := os.LookupEnv("LOG_LEVEL"); ok {
+		if lvl, err := parseLogLevel(lvlStr); err != nil {
+			log.Warnf("Invalid LOG_LEVEL=%q; expected integer 0-6. Using default level %s.", lvlStr, log.GetLevel())
+		} else {
+			log.SetLevel(lvl)
+			log.Debugf("Log level set from LOG_LEVEL=%s (%s)", strings.TrimSpace(lvlStr), log.GetLevel())
+		}
+		return
+	}
+
+	if debugFlag {
+		log.SetLevel(log.DebugLevel)
+	}
+}
+
+func parseLogLevel(s string) (log.Level, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return log.InfoLevel, nil
+	}
+
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 || n > 6 {
+		return log.InfoLevel, err
+	}
+
+	return log.Level(n), nil
+}
+
 func main() {
-	fmt.Print("Starting Vault Secrets Provider...")
+	log.Print("Starting Vault Secrets Provider...")
 	var (
 		flVersion = flag.Bool("version", false, "Print version")
 		flDebug   = flag.Bool("debug", false, "Enable debug logging")
@@ -20,12 +54,11 @@ func main() {
 	flag.Parse()
 
 	if *flVersion {
-		fmt.Println("Vault Secrets Provider v1.0.0")
+		log.Println("Vault Secrets Provider v1.0.0")
 		return
 	}
-	if *flDebug {
-		log.SetLevel(log.DebugLevel)
-	}
+
+	configureLogLevel(*flDebug)
 
 	// Initialize the Vault driver
 	driver, err := NewDriver()

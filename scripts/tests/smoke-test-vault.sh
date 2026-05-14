@@ -19,7 +19,7 @@ SECRET_VALUE="vault-smoke-pass-v1"
 SECRET_VALUE_ROTATED="vault-smoke-pass-v2"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-vault-compose.yml"
 POLICY_FILE="${REPO_ROOT}/vault_conf/admin.hcl"
-
+EXIT_CODE=0
 # Cleanup trap
 cleanup() {
     echo -e "${RED}Running Vault smoke test cleanup...${DEF}"
@@ -28,6 +28,7 @@ cleanup() {
     docker stop "${VAULT_CONTAINER}" 2>/dev/null || true
     docker rm   "${VAULT_CONTAINER}" 2>/dev/null || true
     remove_plugin
+    exit "${EXIT_CODE}"
 }
 trap cleanup EXIT
 
@@ -43,10 +44,10 @@ docker run -d \
 info "Waiting for Vault to be ready..."
 elapsed=0
 until docker exec "${VAULT_CONTAINER}" \
-        vault status -address="http://127.0.0.1:8200" &>/dev/null; do
+        vault status -address="${VAULT_ADDR}" &>/dev/null; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 30 ] || die "Vault did not become ready within 30s."
+    [[ "${elapsed}" -lt 30 ]] || die "Vault did not become ready within 30s."
 done
 success "Vault is ready."
 
@@ -54,14 +55,14 @@ success "Vault is ready."
 info "Applying policy to Vault..."
 docker cp "${POLICY_FILE}" "${VAULT_CONTAINER}:/tmp/admin.hcl"
 docker exec "${VAULT_CONTAINER}" \
-    env VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
+    env VAULT_ADDR="${VAULT_ADDR}" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
     vault policy write smoke-policy /tmp/admin.hcl
 success "Policy applied."
 
 # Add passwords (write test secret)
 info "Writing test secret to Vault..."
 docker exec "${VAULT_CONTAINER}" \
-    env VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
+    env VAULT_ADDR="${VAULT_ADDR}" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
     vault kv put \
     "secret/${SECRET_PATH}" \
     "${SECRET_FIELD}=${SECRET_VALUE}"
@@ -70,7 +71,7 @@ success "Secret written: secret/${SECRET_PATH} ${SECRET_FIELD}=${SECRET_VALUE}"
 # Get the tmp auth token from vault
 info "Getting auth token from Vault..."
 VAULT_TOKEN=$(docker exec "${VAULT_CONTAINER}" \
-    env VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
+    env VAULT_ADDR="${VAULT_ADDR}" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
     vault token create \
         -policy="smoke-policy" \
         -field=token)
@@ -104,6 +105,7 @@ deploy_stack "${COMPOSE_FILE}" "${STACK_NAME}" 60
 info "Logging service output..."
 sleep 10
 log_stack "${STACK_NAME}" "app"
+assert_no_sensitive_rotation_metadata_logs
 
 # Compare password == logged secret
 info "Verifying secret value matches expected password..."
@@ -117,7 +119,7 @@ success "Container to watch: ${APP_CONTAINER_ID:0:12}"
 # Rotate the password and verify
 info "Rotating secret in Vault..."
 docker exec "${VAULT_CONTAINER}" \
-    env VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
+    env VAULT_ADDR="${VAULT_ADDR}" VAULT_TOKEN="${VAULT_ROOT_TOKEN}" \
     vault kv put \
     "secret/${SECRET_PATH}" \
     "${SECRET_FIELD}=${SECRET_VALUE_ROTATED}"
@@ -128,6 +130,7 @@ sleep 15
 
 info "Waiting for new container to start after rotation (10s)..."
 sleep 10
+assert_no_sensitive_rotation_metadata_logs
 
 info "Logging service output after rotation..."
 log_stack "${STACK_NAME}" "app"
