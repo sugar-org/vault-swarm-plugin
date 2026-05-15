@@ -130,8 +130,8 @@ func NewDriver() (*SecretsDriver, error) {
 	if config.UseWebhook && config.ProviderType == "vault" {
 		log.Printf("USE_WEBHOOK=true detected for Vault provider — starting webhook server on port %d", config.WebhookPort)
 		webhookCfg := &providers.WebhookConfig{
-			Port:   config.WebhookPort,
-			Secret: config.WebhookSecret,
+			Port:          config.WebhookPort,
+			WebhookSecret: config.WebhookSecret,
 		}
 		driver.webhookServer = providers.NewWebhookServer(webhookCfg, driver.ReconcileSecret)
 		go func() {
@@ -227,6 +227,7 @@ func (d *SecretsDriver) ReconcileSecret(secretName string) error {
 	}
 	return nil
 }
+
 // shouldNotReuse returns the value for secrets.Response.DoNotReuse.
 // When true, Docker should not reuse a cached value (fetch from provider again).
 // Label secret_reuse: "true" means allow reuse → DoNotReuse must be false (see docs/multi-provider.md).
