@@ -127,8 +127,8 @@ func NewDriver() (*SecretsDriver, error) {
 	if config.EnableRotation && provider.SupportsRotation() && config.UseWebhook && config.ProviderType == "vault" {
 		log.Printf("USE_WEBHOOK=true detected for Vault provider; starting webhook server on port %d", config.WebhookPort)
 		webhookCfg := &providers.WebhookConfig{
-			Port:   config.WebhookPort,
-			Secret: config.WebhookSecret,
+			Port:          config.WebhookPort,
+			WebhookSecret: config.WebhookSecret,
 		}
 		driver.webhookServer = providers.NewWebhookServer(webhookCfg, driver.ReconcileSecret)
 		go func() {

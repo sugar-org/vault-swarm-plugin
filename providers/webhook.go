@@ -57,7 +57,7 @@ type WebhookConfig struct {
 	Port int
 	// Secret is the HMAC token shared with HCP.  When non-empty every
 	// incoming request MUST carry a valid X-HCP-Webhook-Signature header.
-	Secret string
+	WebhookSecret string
 }
 
 // WebhookServer is an HTTP server that receives push events from HCP Vault
@@ -125,16 +125,21 @@ func (ws *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the raw body (needed for HMAC validation before unmarshalling).
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Errorf("webhook: failed to close request body: %v", err)
+		}
+	}()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("webhook: failed to read request body: %v", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
 	// HMAC validation
-	if ws.config.Secret != "" {
+	if ws.config.WebhookSecret != "" {
 		sig := r.Header.Get("X-HCP-Webhook-Signature")
 		if sig == "" {
 			log.Warn("webhook: missing X-HCP-Webhook-Signature header")
@@ -212,7 +217,7 @@ func (ws *WebhookServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 // HCP uses HMAC-SHA256 with the shared token to compute the hex-encoded
 // signature.
 func (ws *WebhookServer) verifyHMAC(body []byte, signature string) bool {
-	mac := hmac.New(sha256.New, []byte(ws.config.Secret))
+	mac := hmac.New(sha256.New, []byte(ws.config.WebhookSecret))
 	mac.Write(body)
 	expected := hex.EncodeToString(mac.Sum(nil))
 
