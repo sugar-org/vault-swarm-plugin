@@ -49,6 +49,8 @@ func parseBoolOrDefault(s string, fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
 // normalizeGCPSecretName ensures the name matches GCP's requirements: [a-zA-Z][a-zA-Z0-9_-]*
 func normalizeGCPSecretName(secretName string) string {
 	if len(secretName) == 0 {
