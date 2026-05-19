@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -136,10 +137,10 @@ func (d *SecretsDriver) buildSecretInfo(req secrets.Request) *providers.SecretIn
 	return &providers.SecretInfo{
 		DockerSecretName: req.SecretName,
 		SecretPath:       d.provider.BuildSecretPath(req),
-		SecretField:	  secretField,
+		SecretField:      secretField,
 		ServiceNames:     []string{req.ServiceName},
 		Provider:         d.provider.GetProviderName(),
-		Labels:           req.SecretLabels,
+		Labels:           maps.Clone(req.SecretLabels),
 	}
 }
 
@@ -169,7 +170,7 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 		}
 	}
 
-	log.Printf("Successfully retrieved secret from %s provider", d.provider.GetProviderName())
+	log.Debugf("Successfully retrieved secret from %s provider", d.provider.GetProviderName())
 
 	// Track this secret for monitoring if rotation is enabled
 	if d.config.EnableRotation && d.provider.SupportsRotation() {

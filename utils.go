@@ -36,4 +36,3 @@ func parseIntOrDefault(intStr string) int {
 	}
 	return 8080 // Default port
 }
-

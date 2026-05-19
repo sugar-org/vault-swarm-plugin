@@ -74,7 +74,7 @@ func (az *AzureProvider) Initialize(config map[string]string) error {
 
 // GetSecret retrieves a secret value from Azure Key Vault based on the request.
 func (az *AzureProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	log.Infof("Reading secret '%s' from Azure Key Vault", secretInfo.SecretPath)
+	log.Debugf("Reading secret '%s' from Azure Key Vault", secretInfo.SecretPath)
 
 	resp, err := az.client.GetSecret(ctx, secretInfo.SecretPath, "", nil)
 	if err != nil {
@@ -90,7 +90,7 @@ func (az *AzureProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) 
 		return nil, fmt.Errorf("failed to extract value from secret '%s': %w", secretInfo.SecretPath, err)
 	}
 
-	log.Infof("Successfully retrieved secret '%s' from Azure Key Vault", secretInfo.SecretPath)
+	log.Debugf("Successfully retrieved secret '%s' from Azure Key Vault", secretInfo.SecretPath)
 	return value, nil
 }
 

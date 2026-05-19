@@ -33,6 +33,10 @@ func (g *GCPProvider) Initialize(config map[string]string) error {
 		CredentialsJSON: config["GCP_CREDENTIALS_JSON"],
 	}
 
+	if g.config.ProjectID == "" {
+		return fmt.Errorf("GCP_PROJECT_ID is required in the configuration")
+	}
+
 	ctx := context.Background()
 	var client *secretmanager.Client
 	var err error
@@ -59,7 +63,7 @@ func (g *GCPProvider) Initialize(config map[string]string) error {
 // GetSecret retrieves a secret value from GCP Secret Manager
 func (g *GCPProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
 	secretName := secretInfo.SecretPath
-	log.Infof("Reading secret from GCP Secret Manager: %s", secretName)
+	log.Debugf("Reading secret from GCP Secret Manager: %s", secretName)
 
 	// Check if the secret name already contains a version path
 	var secretPath string
@@ -98,8 +102,6 @@ func (g *GCPProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]
 }
 
 // BuildSecretPath constructs the GCP secret name, handling partial or complete paths securely.
-// Note: this method cannot return an error via the interface, so missing ProjectID
-// for short names will produce an empty-project path that the API will reject.
 func (g *GCPProvider) BuildSecretPath(req secrets.Request) string {
 	projectID := g.config.ProjectID
 	var secretName string
@@ -142,4 +144,3 @@ func (g *GCPProvider) Close() error {
 	}
 	return nil
 }
-

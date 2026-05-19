@@ -80,7 +80,7 @@ func (o *OpenBaoProvider) Initialize(config map[string]string) error {
 
 // GetSecret retrieves a secret value from OpenBao
 func (o *OpenBaoProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	log.Printf("Reading secret from OpenBao path: %s", secretInfo.SecretPath)
+	log.Debugf("Reading secret from OpenBao path: %s", secretInfo.SecretPath)
 
 	// Read secret from OpenBao
 	secret, err := o.client.Logical().ReadWithContext(ctx, secretInfo.SecretPath)
@@ -98,7 +98,7 @@ func (o *OpenBaoProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo)
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Printf("Successfully retrieved secret from OpenBao")
+	log.Debugf("Successfully retrieved secret from OpenBao")
 	return value, nil
 }
 

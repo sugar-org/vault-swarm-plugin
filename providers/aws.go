@@ -56,7 +56,7 @@ func (a *AWSProvider) Initialize(config map[string]string) error {
 
 // GetSecret retrieves a secret value from AWS Secrets Manager
 func (a *AWSProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	log.Printf("Reading secret from AWS Secrets Manager: %s", secretInfo.SecretPath)
+	log.Debugf("Reading secret from AWS Secrets Manager: %s", secretInfo.SecretPath)
 
 	// Get secret value from AWS Secrets Manager
 	input := &secretsmanager.GetSecretValueInput{
@@ -78,7 +78,7 @@ func (a *AWSProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Printf("Successfully retrieved secret from AWS Secrets Manager")
+	log.Debugf("Successfully retrieved secret from AWS Secrets Manager")
 	return value, nil
 }
 

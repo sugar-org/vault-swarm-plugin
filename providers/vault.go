@@ -80,7 +80,7 @@ func (v *VaultProvider) Initialize(config map[string]string) error {
 
 // GetSecret retrieves a secret value from Vault
 func (v *VaultProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	log.Printf("Reading secret from Vault/OpenBao path: %s", secretInfo.SecretPath)
+	log.Debugf("Reading secret from Vault/OpenBao path: %s", secretInfo.SecretPath)
 
 	// Read secret from Vault
 	secret, err := v.client.Logical().ReadWithContext(ctx, secretInfo.SecretPath)
@@ -98,7 +98,7 @@ func (v *VaultProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) (
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Printf("Successfully retrieved secret from Vault")
+	log.Debugf("Successfully retrieved secret from Vault")
 	return value, nil
 }
 
