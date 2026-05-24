@@ -1,0 +1,39 @@
+name: semgrep
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+
+    container:
+      image: semgrep/semgrep
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          semgrep ci \
+            --config p/golang \
+            --config semgrep/rules/ \
+            --sarif \
+            --output semgrep.sarif \
+          || true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

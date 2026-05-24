@@ -30,6 +30,12 @@ pre-commit:
       skip:
         - run: test "$CI" = "true"
 
+    semgrep:
+      glob: "**/*.go"
+      run: semgrep scan --config p/golang --config semgrep/rules/ --quiet
+      skip:
+        - run: test "$CI" = "true"
+
     gosec:
       glob: "**/*.go"
       run: gosec ./...
