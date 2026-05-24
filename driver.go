@@ -19,11 +19,6 @@ import (
 	"github.com/sugar-org/vault-swarm-plugin/providers"
 )
 
-const (
-	kvV2PathFormat        = "secret/data/%s"
-	kvV2ServicePathFormat = "secret/data/%s/%s"
-)
-
 // SecretsDriver implements the secrets.Driver interface with multi-provider support
 type SecretsDriver struct {
 	provider      providers.SecretsProvider
@@ -660,7 +655,6 @@ func (d *SecretsDriver) buildVaultSecretPath(req secrets.Request) string {
 	return kvpath.BuildMountedKVv2SecretPath(
 		d.getProviderMountPath("vault"),
 		req.SecretLabels["vault_path"],
-		req.ServiceName,
 		req.SecretName,
 	)
 }
@@ -669,7 +663,6 @@ func (d *SecretsDriver) buildOpenBaoSecretPath(req secrets.Request) string {
 	return kvpath.BuildMountedKVv2SecretPath(
 		d.getProviderMountPath("openbao"),
 		req.SecretLabels["openbao_path"],
-		req.ServiceName,
 		req.SecretName,
 	)
 }

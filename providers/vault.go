@@ -197,7 +197,6 @@ func (v *VaultProvider) buildSecretPath(req secrets.Request) string {
 	return kvpath.BuildMountedKVv2SecretPath(
 		v.config.MountPath,
 		req.SecretLabels["vault_path"],
-		req.ServiceName,
 		req.SecretName,
 	)
 }

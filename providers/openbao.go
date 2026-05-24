@@ -197,7 +197,6 @@ func (o *OpenBaoProvider) buildSecretPath(req secrets.Request) string {
 	return kvpath.BuildMountedKVv2SecretPath(
 		o.config.MountPath,
 		req.SecretLabels["openbao_path"],
-		req.ServiceName,
 		req.SecretName,
 	)
 }

@@ -5,13 +5,9 @@ import (
 	"strings"
 )
 
-func BuildMountedKVv2SecretPath(mountPath, customPath, serviceName, secretName string) string {
+func BuildMountedKVv2SecretPath(mountPath, customPath, secretName string) string {
 	if customPath != "" {
 		return fmt.Sprintf("%s/data/%s", mountPath, NormalizeRelativePath(mountPath, customPath))
-	}
-
-	if serviceName != "" {
-		return fmt.Sprintf("%s/data/%s/%s", mountPath, serviceName, secretName)
 	}
 
 	return fmt.Sprintf("%s/data/%s", mountPath, secretName)
