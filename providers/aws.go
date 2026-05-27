@@ -25,7 +25,7 @@ type AWSProvider struct {
 type AWSConfig struct {
 	Region      string
 	AccessKey   string // #nosec G117
-	SecretKey   string
+	SecretKey   string // #nosec G117
 	Profile     string
 	EndpointURL string
 }
