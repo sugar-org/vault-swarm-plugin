@@ -3,11 +3,13 @@ package providers
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/docker/go-plugins-helpers/secrets"
 	"github.com/openbao/openbao/api/v2"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/sugar-org/swarm-external-secrets/internal/kvpath"
 	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
@@ -116,28 +118,16 @@ func (o *OpenBaoProvider) GetSecretFieldLabel() string {
 
 // BuildSecretPath constructs the OpenBao secret path based on request labels and service information
 func (o *OpenBaoProvider) BuildSecretPath(req secrets.Request) string {
-	// Use custom path from labels if provided
 	if customPath, exists := req.SecretLabels["openbao_path"]; exists {
-		// For KV v2, ensure we have the /data/ prefix
-		if o.config.MountPath == "secret" {
-			return fmt.Sprintf("%s/data/%s", o.config.MountPath, customPath)
-		}
-		return fmt.Sprintf("%s/%s", o.config.MountPath, customPath)
+		return kvpath.BuildMountedKVv2SecretPath(o.config.MountPath, customPath, "")
 	}
 
-	// Default path structure for KV v2
-	if o.config.MountPath == "secret" {
-		if req.ServiceName != "" {
-			return fmt.Sprintf("%s/data/%s/%s", o.config.MountPath, req.ServiceName, req.SecretName)
-		}
-		return fmt.Sprintf("%s/data/%s", o.config.MountPath, req.SecretName)
-	}
-
-	// For other mount paths
+	secretName := req.SecretName
 	if req.ServiceName != "" {
-		return fmt.Sprintf("%s/%s/%s", o.config.MountPath, req.ServiceName, req.SecretName)
+		secretName = path.Join(req.ServiceName, req.SecretName)
 	}
-	return fmt.Sprintf("%s/%s", o.config.MountPath, req.SecretName)
+
+	return kvpath.BuildMountedKVv2SecretPath(o.config.MountPath, "", secretName)
 }
 
 // GetProviderName returns the name of this provider

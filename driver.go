@@ -341,8 +341,12 @@ func (d *SecretsDriver) hasSecretChanged(secretInfo *providers.SecretInfo) bool 
 		return false
 	}
 
+	d.trackerMutex.RLock()
+	lastHash := secretInfo.LastHash
+	d.trackerMutex.RUnlock()
+
 	currentHash := fmt.Sprintf("%x", sha256.Sum256(currentValue))
-	return currentHash != secretInfo.LastHash
+	return currentHash != lastHash
 }
 
 // rotateSecret handles the secret rotation process
