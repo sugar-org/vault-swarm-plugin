@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -7,7 +7,18 @@ import (
 )
 
 // getEnvOrDefault returns environment variable value or default
-func getEnvOrDefault(key, defaultValue string) string {
+func GetEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getConfigOrDefault returns config value or environment variable or default
+func GetConfigOrDefault(config map[string]string, key, defaultValue string) string {
+	if value, exists := config[key]; exists && value != "" {
+		return value
+	}
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
@@ -15,7 +26,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 // parseDurationOrDefault parses duration string or returns default
-func parseDurationOrDefault(durationStr string) time.Duration {
+func ParseDurationOrDefault(durationStr string) time.Duration {
 	if duration, err := time.ParseDuration(durationStr); err == nil {
 		return duration
 	}
@@ -23,7 +34,7 @@ func parseDurationOrDefault(durationStr string) time.Duration {
 }
 
 // parseIntOrDefault parses integer string or returns default
-func parseIntOrDefault(intStr string) int {
+func ParseIntOrDefault(intStr string) int {
 	if val, err := fmt.Sscanf(intStr, "%d", new(int)); err == nil && val == 1 {
 		var result int
 		_, err := fmt.Sscanf(intStr, "%d", &result)

@@ -131,6 +131,28 @@ docker plugin set swarm-external-secrets:latest \
          openbao_field: "secret_key"
    ```
 
+4. Optional: enable plugin log sidecar (for `docker compose logs` visibility):
+
+   On Linux, the default plugin log path is `/run/swarm-external-secrets/plugin.log`.
+   macOS and Windows filesystems do not support this `/run/**` path by default, so
+   create a writable log directory on the host and point `PLUGIN_LOG_PATH` at it.
+
+   ```bash
+   sudo mkdir -p /run/swarm-external-secrets
+   sudo touch /run/swarm-external-secrets/plugin.log
+   docker compose -f docker-compose.yml -f docker-compose.logs.yml up -d
+   docker compose -f docker-compose.yml -f docker-compose.logs.yml logs -f secrets-logger
+   ```
+
+   Example for macOS or Windows Docker Desktop:
+
+   ```bash
+   mkdir -p ./logs
+   touch ./logs/plugin.log
+   docker plugin set swarm-external-secrets:latest \
+     PLUGIN_LOG_PATH="$PWD/logs/plugin.log"
+   ```
+
 | Provider | Status | Authentication | Rotation |
 |----------|--------|---------------|----------|
 | HashiCorp Vault | ✅ Stable | Token, AppRole | ✅ |

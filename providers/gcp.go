@@ -10,6 +10,8 @@ import (
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
+
+	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
 // GCPProvider implements the SecretsProvider interface for GCP Secret Manager
@@ -28,8 +30,8 @@ type GCPConfig struct {
 // Initialize sets up the GCP provider with the given configuration
 func (g *GCPProvider) Initialize(config map[string]string) error {
 	g.config = &GCPConfig{
-		ProjectID:       getConfigOrDefault(config, "GCP_PROJECT_ID", ""),
-		CredentialsPath: getConfigOrDefault(config, "GOOGLE_APPLICATION_CREDENTIALS", ""),
+		ProjectID:       utils.GetConfigOrDefault(config, "GCP_PROJECT_ID", ""),
+		CredentialsPath: utils.GetConfigOrDefault(config, "GOOGLE_APPLICATION_CREDENTIALS", ""),
 		CredentialsJSON: config["GCP_CREDENTIALS_JSON"],
 	}
 

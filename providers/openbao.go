@@ -7,6 +7,8 @@ import (
 	"github.com/docker/go-plugins-helpers/secrets"
 	"github.com/openbao/openbao/api/v2"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
 // OpenBaoProvider implements the SecretsProvider interface for OpenBao
@@ -33,16 +35,16 @@ type OpenBaoConfig struct {
 // Initialize sets up the OpenBao provider with the given configuration
 func (o *OpenBaoProvider) Initialize(config map[string]string) error {
 	o.config = &OpenBaoConfig{
-		Address:    getConfigOrDefault(config, "OPENBAO_ADDR", "http://localhost:8200"),
+		Address:    utils.GetConfigOrDefault(config, "OPENBAO_ADDR", "http://localhost:8200"),
 		Token:      config["OPENBAO_TOKEN"],
-		MountPath:  getConfigOrDefault(config, "OPENBAO_MOUNT_PATH", "secret"),
+		MountPath:  utils.GetConfigOrDefault(config, "OPENBAO_MOUNT_PATH", "secret"),
 		RoleID:     config["OPENBAO_ROLE_ID"],
 		SecretID:   config["OPENBAO_SECRET_ID"],
-		AuthMethod: getConfigOrDefault(config, "OPENBAO_AUTH_METHOD", "token"),
+		AuthMethod: utils.GetConfigOrDefault(config, "OPENBAO_AUTH_METHOD", "token"),
 		CACert:     config["OPENBAO_CACERT"],
 		ClientCert: config["OPENBAO_CLIENT_CERT"],
 		ClientKey:  config["OPENBAO_CLIENT_KEY"],
-		SkipVerify: getConfigOrDefault(config, "OPENBAO_SKIP_VERIFY", "false") == "true",
+		SkipVerify: utils.GetConfigOrDefault(config, "OPENBAO_SKIP_VERIFY", "false") == "true",
 	}
 
 	// Configure OpenBao client (using OpenBao API client since OpenBao is compatible)

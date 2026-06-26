@@ -27,6 +27,14 @@ The following environment variables control the rotation behavior:
 | `ROTATION_INTERVAL` | How often to check for changes | `10s` |
 | `LOG_LEVEL` | Optional log level integer `0-6` (use `6` for trace) | `4` (info) |
 
+For Vault and OpenBao, rotation tracking uses the same configured mount path as normal secret reads:
+
+- Default KV mount: `secret`
+- Custom mounts are supported via `VAULT_MOUNT_PATH` and `OPENBAO_MOUNT_PATH`
+- Example custom mounts: `kv`, `prod`, `dev`
+
+If a custom mount path is configured, rotation monitoring checks that mount instead of assuming `secret/data/...`.
+
 ### Example Configuration
 
 ```bash
@@ -57,6 +65,20 @@ docker plugin set swarm-external-secrets:latest \
    vault kv put secret/database/mysql password=new_secure_password
    ```
 
+### Custom Mount Path Example
+
+If Vault or OpenBao is mounted somewhere other than `secret`, configure the plugin with the matching mount path so rotation tracking monitors the correct backend:
+
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="vault" \
+    VAULT_ADDR="http://127.0.0.1:8200" \
+    VAULT_TOKEN="root" \
+    VAULT_MOUNT_PATH="kv"
+```
+
+Then a secret such as `kv/data/database/mysql` is tracked and rotated against the configured `kv` mount instead of the default `secret` mount.
+
 3. **Automatic rotation**: Within the next rotation interval (default 5 minutes), the plugin will:
    - Detect the change in Vault
    - Update the Docker secret with the new value
@@ -67,11 +89,43 @@ docker plugin set swarm-external-secrets:latest \
 Check plugin logs to monitor rotation activity:
 
 ```bash
-# View plugin logs
-sudo journalctl -u docker.service -f | grep vault
+# View plugin logs from the shared host file
+tail -F /run/swarm-external-secrets/plugin.log
 
-# Check for rotation events
-docker service logs <service-name>
+# Filter rotation events
+tail -F /run/swarm-external-secrets/plugin.log | grep -E "rotation|Failed to rotate|Detected change"
+```
+
+On Linux, the default plugin log path is `/run/swarm-external-secrets/plugin.log`.
+macOS and Windows filesystems do not support this `/run/**` path by default. On
+those hosts, create a log directory with read/write permissions and set
+`PLUGIN_LOG_PATH` to that file:
+
+```bash
+mkdir -p ./logs
+touch ./logs/plugin.log
+docker plugin set swarm-external-secrets:latest \
+  PLUGIN_LOG_PATH="$PWD/logs/plugin.log"
+```
+
+You can also expose these logs through the bundled compose override:
+
+```bash
+sudo mkdir -p /run/swarm-external-secrets
+sudo touch /run/swarm-external-secrets/plugin.log
+docker compose -f docker-compose.yml -f docker-compose.logs.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.logs.yml logs -f secrets-logger
+```
+
+The sidecar service in `docker-compose.logs.yml` is:
+
+```yaml
+services:
+  secrets-logger:
+    image: alpine:3.20
+    command: sh -c "tail -F /run/swarm-external-secrets/plugin.log"
+    volumes:
+      - /run/swarm-external-secrets:/run/swarm-external-secrets:ro
 ```
 
 ## Benefits

@@ -3,11 +3,12 @@ package providers
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/docker/go-plugins-helpers/secrets"
 	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
 // VaultProvider implements the SecretsProvider interface for HashiCorp Vault
@@ -33,16 +34,16 @@ type SecretsConfig struct {
 // Initialize sets up the Vault provider with the given configuration
 func (v *VaultProvider) Initialize(config map[string]string) error {
 	v.config = &SecretsConfig{
-		Address:    getConfigOrDefault(config, "VAULT_ADDR", ""),
-		Token:      getConfigOrDefault(config, "VAULT_TOKEN", ""),
-		MountPath:  getConfigOrDefault(config, "VAULT_MOUNT_PATH", "secret"),
+		Address:    utils.GetConfigOrDefault(config, "VAULT_ADDR", ""),
+		Token:      utils.GetConfigOrDefault(config, "VAULT_TOKEN", ""),
+		MountPath:  utils.GetConfigOrDefault(config, "VAULT_MOUNT_PATH", "secret"),
 		RoleID:     config["VAULT_ROLE_ID"],
 		SecretID:   config["VAULT_SECRET_ID"],
-		AuthMethod: getConfigOrDefault(config, "VAULT_AUTH_METHOD", "token"),
+		AuthMethod: utils.GetConfigOrDefault(config, "VAULT_AUTH_METHOD", "token"),
 		CACert:     config["VAULT_CACERT"],
 		ClientCert: config["VAULT_CLIENT_CERT"],
 		ClientKey:  config["VAULT_CLIENT_KEY"],
-		SkipVerify: getConfigOrDefault(config, "VAULT_SKIP_VERIFY", "false") == "true",
+		SkipVerify: utils.GetConfigOrDefault(config, "VAULT_SKIP_VERIFY", "false") == "true",
 	}
 
 	// Configure Vault client
@@ -184,15 +185,4 @@ func (v *VaultProvider) authenticate() error {
 	}
 
 	return nil
-}
-
-// getConfigOrDefault returns config value or environment variable or default
-func getConfigOrDefault(config map[string]string, key, defaultValue string) string {
-	if value, exists := config[key]; exists && value != "" {
-		return value
-	}
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

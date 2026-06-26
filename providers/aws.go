@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
 // AWSProvider implements the SecretsProvider interface for AWS Secrets Manager
@@ -30,7 +32,7 @@ type AWSConfig struct {
 // Initialize sets up the AWS provider with the given configuration
 func (a *AWSProvider) Initialize(config map[string]string) error {
 	a.config = &AWSConfig{
-		Region:      getConfigOrDefault(config, "AWS_REGION", "us-east-1"),
+		Region:      utils.GetConfigOrDefault(config, "AWS_REGION", "us-east-1"),
 		AccessKey:   config["AWS_ACCESS_KEY_ID"],
 		SecretKey:   config["AWS_SECRET_ACCESS_KEY"],
 		Profile:     config["AWS_PROFILE"],

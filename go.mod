@@ -1,4 +1,4 @@
-module github.com/sugar-org/vault-swarm-plugin
+module github.com/sugar-org/swarm-external-secrets
 
 go 1.24.2
 
