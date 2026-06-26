@@ -114,15 +114,15 @@ func NewDriver() (*SecretsDriver, error) {
 
 	// Start monitoring if rotation is enabled and provider supports it
 	if config.EnableRotation && provider.SupportsRotation() {
-		log.Printf("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
+		log.Infof("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
 		go driver.startMonitoring()
 	} else if config.EnableRotation {
-		log.Printf("Secret rotation is enabled but provider %s does not support rotation", config.ProviderType)
+		log.Warnf("Secret rotation is enabled but provider %s does not support rotation", config.ProviderType)
 	} else {
-		log.Printf("Secret rotation monitoring is disabled")
+		log.Debug("Secret rotation monitoring is disabled")
 	}
 
-	log.Printf("Successfully initialized driver with %s provider", provider.GetProviderName())
+	log.Infof("Successfully initialized driver with %s provider", provider.GetProviderName())
 	return driver, nil
 }
 
@@ -258,12 +258,12 @@ func (d *SecretsDriver) startMonitoring() {
 	ticker := time.NewTicker(d.config.RotationInterval)
 	defer ticker.Stop()
 
-	log.Printf("Secret monitoring started with interval: %v", d.config.RotationInterval)
+	log.Infof("Secret monitoring started with interval: %v", d.config.RotationInterval)
 
 	for {
 		select {
 		case <-d.monitorCtx.Done():
-			log.Printf("Secret monitoring stopped")
+			log.Info("Secret monitoring stopped")
 			return
 		case <-ticker.C:
 			// Update ticker heartbeat for monitoring

@@ -90,7 +90,7 @@ func (g *GCPProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]
 
 	// Store version information for rotation tracking
 	if g.SupportsRotation() {
-		log.Printf("Secret version for rotation tracking: %s", result.Name)
+		log.Debugf("Secret version for rotation tracking: %s", result.Name)
 	}
 
 	// Extract the specific field from the secret data

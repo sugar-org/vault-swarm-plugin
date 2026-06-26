@@ -49,7 +49,7 @@ func (wi *WebInterface) Start() error {
 		}
 	}()
 
-	log.Printf("Started web monitoring interface on %s", wi.server.Addr)
+	log.Infof("Started web monitoring interface on %s", wi.server.Addr)
 	return nil
 }
 
@@ -174,9 +174,9 @@ const dashboardTemplate = `
     <title>Vault Swarm Plugin Monitor</title>
     <meta http-equiv="refresh" content="30">
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
             background-color: #f5f5f5;
         }
         .container {
@@ -325,9 +325,9 @@ const dashboardTemplate = `
         </div>
 
         <div class="footer">
-            <p>Page auto-refreshes every 30 seconds | 
-               <a href="/metrics">JSON Metrics</a> | 
-               <a href="/health">Health Check</a> | 
+            <p>Page auto-refreshes every 30 seconds |
+               <a href="/metrics">JSON Metrics</a> |
+               <a href="/health">Health Check</a> |
                <a href="/api/metrics">Prometheus Metrics</a>
             </p>
         </div>

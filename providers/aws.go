@@ -52,7 +52,7 @@ func (a *AWSProvider) Initialize(config map[string]string) error {
 		}
 	})
 
-	log.Printf("Successfully initialized AWS Secrets Manager provider for region: %s", a.config.Region)
+	log.Infof("Successfully initialized AWS Secrets Manager provider for region: %s", a.config.Region)
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (a *AWSProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Debugf("Successfully retrieved secret from AWS Secrets Manager")
+	log.Debug("Successfully retrieved secret from AWS Secrets Manager")
 	return value, nil
 }
 

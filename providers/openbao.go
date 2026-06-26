@@ -76,7 +76,7 @@ func (o *OpenBaoProvider) Initialize(config map[string]string) error {
 		return fmt.Errorf("failed to authenticate with OpenBao: %v", err)
 	}
 
-	log.Printf("Successfully initialized OpenBao provider using %s method", o.config.AuthMethod)
+	log.Infof("Successfully initialized OpenBao provider using %s method", o.config.AuthMethod)
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (o *OpenBaoProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo)
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Debugf("Successfully retrieved secret from OpenBao")
+	log.Debug("Successfully retrieved secret from OpenBao")
 	return value, nil
 }
 

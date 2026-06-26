@@ -56,7 +56,7 @@ func NewMonitor(interval time.Duration) *Monitor {
 // Start begins the monitoring process
 func (m *Monitor) Start() {
 	go m.monitorLoop()
-	log.Printf("Started system monitoring with interval: %v", m.interval)
+	log.Infof("Started system monitoring with interval: %v", m.interval)
 }
 
 // Stop stops the monitoring process
@@ -74,7 +74,7 @@ func (m *Monitor) Stop() {
 			close(listener)
 		}
 		m.listeners = nil
-		log.Printf("Stopped system monitoring")
+		log.Info("Stopped system monitoring")
 	})
 }
 

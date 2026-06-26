@@ -75,7 +75,7 @@ func (v *VaultProvider) Initialize(config map[string]string) error {
 		return fmt.Errorf("failed to authenticate with vault: %v", err)
 	}
 
-	log.Printf("Successfully initialized Vault provider using %s method", v.config.AuthMethod)
+	log.Infof("Successfully initialized Vault provider using %s method", v.config.AuthMethod)
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (v *VaultProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) (
 		return nil, fmt.Errorf("failed to extract secret value: %v", err)
 	}
 
-	log.Debugf("Successfully retrieved secret from Vault")
+	log.Debug("Successfully retrieved secret from Vault")
 	return value, nil
 }
 
