@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -137,7 +138,7 @@ func (d *SecretsDriver) buildSecretInfo(req secrets.Request) *providers.SecretIn
 
 	return &providers.SecretInfo{
 		DockerSecretName: req.SecretName,
-		SecretPath:       d.provider.BuildSecretPath(req),
+		SecretPath:       d.provider.BuildSecretPath(req), // Start with current service
 		SecretField:      secretField,
 		ServiceNames:     []string{req.ServiceName},
 		Provider:         d.provider.GetProviderName(),
@@ -230,13 +231,7 @@ func (d *SecretsDriver) trackSecret(secretInfo *providers.SecretInfo, value []by
 	if existing, exists := d.secretTracker[secretInfo.DockerSecretName]; exists {
 		// Add service name if not already present
 		serviceName := secretInfo.ServiceNames[0]
-		serviceFound := false
-		for _, svc := range existing.ServiceNames {
-			if svc == serviceName {
-				serviceFound = true
-				break
-			}
-		}
+		serviceFound := slices.Contains(existing.ServiceNames, serviceName)
 		if !serviceFound && serviceName != "" {
 			existing.ServiceNames = append(existing.ServiceNames, serviceName)
 		}
@@ -279,9 +274,7 @@ func (d *SecretsDriver) startMonitoring() {
 func (d *SecretsDriver) checkForSecretChanges() {
 	d.trackerMutex.RLock()
 	secrets := make(map[string]*providers.SecretInfo, len(d.secretTracker))
-	for k, v := range d.secretTracker {
-		secrets[k] = v
-	}
+	maps.Copy(secrets, d.secretTracker)
 	d.trackerMutex.RUnlock()
 
 	if len(secrets) == 0 {

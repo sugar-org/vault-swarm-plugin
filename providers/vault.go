@@ -117,7 +117,7 @@ func (v *VaultProvider) GetSecretFieldLabel() string {
 
 // BuildSecretPath constructs the Vault secret path based on request labels and service information
 func (v *VaultProvider) BuildSecretPath(req secrets.Request) string {
-	if customPath, exists := req.SecretLabels["vault_path"]; exists {
+	if customPath, exists := req.SecretLabels["vault_path"]; exists && customPath != "" {
 		return kvpath.BuildMountedKVv2SecretPath(v.config.MountPath, customPath, "")
 	}
 

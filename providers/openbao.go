@@ -118,7 +118,7 @@ func (o *OpenBaoProvider) GetSecretFieldLabel() string {
 
 // BuildSecretPath constructs the OpenBao secret path based on request labels and service information
 func (o *OpenBaoProvider) BuildSecretPath(req secrets.Request) string {
-	if customPath, exists := req.SecretLabels["openbao_path"]; exists {
+	if customPath, exists := req.SecretLabels["openbao_path"]; exists && customPath != "" {
 		return kvpath.BuildMountedKVv2SecretPath(o.config.MountPath, customPath, "")
 	}
 
