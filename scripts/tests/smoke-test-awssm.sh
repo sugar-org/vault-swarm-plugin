@@ -24,6 +24,7 @@ SECRET_PATH="database/mysql"
 SECRET_FIELD="password"
 SECRET_VALUE="awssm-smoke-pass-v1"
 SECRET_VALUE_ROTATED="awssm-smoke-pass-v2"
+KMS_KEY_ALIAS="alias/smoke-awssm"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-awssm-compose.yml"
 
 # Helper to run the AWS CLI against the floci endpoint. Floci needs no real
@@ -73,13 +74,37 @@ until aws_cmd secretsmanager list-secrets >/dev/null 2>&1; do
 done
 success "floci is ready."
 
+info "Creating test KMS key..."
+KMS_KEY_ID="$(aws_cmd kms create-key \
+    --region "${AWS_REGION}" \
+    --description "swarm-external-secrets smoke test key" \
+    --query 'KeyMetadata.KeyId' \
+    --output text)"
+aws_cmd kms create-alias \
+    --region "${AWS_REGION}" \
+    --alias-name "${KMS_KEY_ALIAS}" \
+    --target-key-id "${KMS_KEY_ID}"
+success "KMS key created: ${KMS_KEY_ALIAS}"
+
+encrypt_with_kms() {
+    local plaintext="$1"
+    aws_cmd kms encrypt \
+        --region "${AWS_REGION}" \
+        --key-id "${KMS_KEY_ALIAS}" \
+        --plaintext "${plaintext}" \
+        --cli-binary-format raw-in-base64-out \
+        --query 'CiphertextBlob' \
+        --output text
+}
+
 # Write test secret
-info "Writing test secret to AWS Secrets Manager..."
+info "Writing KMS-encrypted test secret to AWS Secrets Manager..."
+SECRET_CIPHERTEXT="$(encrypt_with_kms "${SECRET_VALUE}")"
 aws_cmd secretsmanager create-secret \
     --region "${AWS_REGION}" \
     --name "${SECRET_PATH}" \
-    --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_VALUE}\"}"
-success "Secret written: ${SECRET_PATH} ${SECRET_FIELD}=${SECRET_VALUE}"
+    --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_CIPHERTEXT}\"}"
+success "Encrypted secret written: ${SECRET_PATH} ${SECRET_FIELD}"
 
 # Build plugin
 info "Building plugin and setting AWS Secrets Manager config..."
@@ -117,10 +142,11 @@ verify_secret "${STACK_NAME}" "app" "${SECRET_NAME}" "${SECRET_VALUE}" 60
 
 # Rotate the password and verify
 info "Rotating secret in AWS Secrets Manager..."
+SECRET_CIPHERTEXT_ROTATED="$(encrypt_with_kms "${SECRET_VALUE_ROTATED}")"
 aws_cmd secretsmanager put-secret-value \
     --region "${AWS_REGION}" \
     --secret-id "${SECRET_PATH}" \
-    --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_VALUE_ROTATED}\"}"
+    --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_CIPHERTEXT_ROTATED}\"}"
 success "Secret rotated to: ${SECRET_VALUE_ROTATED}"
 
 info "Waiting for plugin rotation interval (15s)..."
@@ -133,4 +159,4 @@ log_stack "${STACK_NAME}" "app"
 info "Verifying rotated secret value..."
 verify_secret "${STACK_NAME}" "app" "${SECRET_NAME}" "${SECRET_VALUE_ROTATED}" 180
 
-success "AWS Secrets Manager smoke test PASSED"
+success "AWS Secrets Manager with AWS KMS smoke test PASSED"

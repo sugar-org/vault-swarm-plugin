@@ -12,6 +12,7 @@ type SecretInfo struct {
 	DockerSecretName string
 	SecretPath       string
 	SecretField      string
+	SecretLabels     map[string]string
 	ServiceNames     []string
 	LastHash         string // Hash of the secret value for change detection
 	LastUpdated      time.Time

@@ -24,6 +24,8 @@ secrets:
     labels:
       aws_secret_name: "database/mysql"
       aws_field: "password"
+      kms_decrypt: "true"
+      kms_ciphertext_encoding: "base64"
 
 networks:
   default:
