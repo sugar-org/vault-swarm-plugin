@@ -49,23 +49,14 @@ func (v *VaultProvider) Initialize(config map[string]string) error {
 	}
 
 	// Configure Vault client
-	SecretsConfig := api.DefaultConfig()
-	SecretsConfig.Address = v.config.Address
+	apiConfig := api.DefaultConfig()
+	apiConfig.Address = v.config.Address
 
-	// Configure TLS if certificates are provided or verification is skipped
-	if v.config.CACert != "" || v.config.ClientCert != "" || v.config.SkipVerify {
-		tlsConfig := &api.TLSConfig{
-			CACert:     v.config.CACert,
-			ClientCert: v.config.ClientCert,
-			ClientKey:  v.config.ClientKey,
-			Insecure:   v.config.SkipVerify,
-		}
-		if err := SecretsConfig.ConfigureTLS(tlsConfig); err != nil {
-			return fmt.Errorf("failed to configure TLS: %v", err)
-		}
+	if err := configureVaultTLS(apiConfig, v.config); err != nil {
+		return fmt.Errorf("failed to configure vault TLS: %w", err)
 	}
 
-	client, err := api.NewClient(SecretsConfig)
+	client, err := api.NewClient(apiConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create vault client: %v", err)
 	}
@@ -79,6 +70,28 @@ func (v *VaultProvider) Initialize(config map[string]string) error {
 
 	log.Infof("Successfully initialized Vault provider using %s method", v.config.AuthMethod)
 	return nil
+}
+
+func configureVaultTLS(apiConfig *api.Config, config *SecretsConfig) error {
+	if !hasVaultTLSSettings(config) {
+		return nil
+	}
+
+	tlsConfig := &api.TLSConfig{
+		CACert:     config.CACert,
+		ClientCert: config.ClientCert,
+		ClientKey:  config.ClientKey,
+		Insecure:   config.SkipVerify,
+	}
+
+	return apiConfig.ConfigureTLS(tlsConfig)
+}
+
+func hasVaultTLSSettings(config *SecretsConfig) bool {
+	return config.CACert != "" ||
+		config.ClientCert != "" ||
+		config.ClientKey != "" ||
+		config.SkipVerify
 }
 
 // GetSecret retrieves a secret value from Vault

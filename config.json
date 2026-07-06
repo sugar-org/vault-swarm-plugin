@@ -204,6 +204,21 @@
       "settable": ["value"]
     },
     {
+      "name": "VAULT_CACERT",
+      "description": "Path to CA certificate for Vault TLS",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_CLIENT_CERT",
+      "description": "Path to client certificate for Vault mTLS",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_CLIENT_KEY",
+      "description": "Path to client private key for Vault mTLS",
+      "settable": ["value"]
+    },
+    {
       "name": "VAULT_SKIP_VERIFY",
       "description": "Skip TLS certificate verification for Vault (true/false)",
       "settable": ["value"]

@@ -49,6 +49,9 @@ groups:
       smoke-test-openbao:
         help: Run OpenBao smoke test to validate plugin end-to-end
         run: bash ./scripts/tests/smoke-test-openbao.sh
+      smoke-test-vault-mtls:
+        help: Run Vault mTLS smoke test with OpenSSL-generated certificates
+        run: bash ./scripts/tests/smoke-test-vault-mtls.sh
   ci:
     # Aggregate tasks useful for CI pipelines
     tasks:

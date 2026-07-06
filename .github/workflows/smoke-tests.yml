@@ -43,6 +43,21 @@ jobs:
         run: bash scripts/tests/smoke-test-${{ matrix.provider }}.sh
 
 
+  smoke-test-vault-mtls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Init Docker Swarm
+        run: docker swarm init
+
+      - name: Run Vault mTLS smoke test
+        run: bash scripts/tests/smoke-test-vault-mtls.sh
+
   smoke-test-awssm:
     runs-on: ubuntu-latest
     steps:
