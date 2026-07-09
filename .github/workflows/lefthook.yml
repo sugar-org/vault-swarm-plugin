@@ -56,5 +56,8 @@ jobs:
             golangci-lint run ./...
           fi
 
+      - name: Run tests with race detector
+        run: go test -race ./...
+
       - name: Check for uncommitted changes
         run: git diff --exit-code
