@@ -84,6 +84,21 @@
       "settable": ["value"]
     },
     {
+      "name": "VAULT_ENABLE_ROTATION",
+      "description": "Enable automatic secret rotation (true/false)",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_ROTATION_INTERVAL",
+      "description": "Secret rotation check interval (e.g., 5m, 1h)",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for Vault (true/false)",
+      "settable": ["value"]
+    },
+    {
       "name": "SECRETS_PROVIDER",
       "description": "Secrets provider type (e.g., vault, openbao)",
       "settable": ["value"]
@@ -146,6 +161,11 @@
     {
       "name": "OPENBAO_MOUNT_PATH",
       "description": "OpenBao mount path",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_SKIP_VERIFY",
+      "description": "Skip TLS certificate verification for OpenBao (true/false)",
       "settable": ["value"]
     },
     {
