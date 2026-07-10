@@ -18,30 +18,22 @@ jobs:
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      - name: Init Docker Swarm
-        run: docker swarm init
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Run smoke test for ${{ matrix.provider }}
-        run: bash scripts/tests/smoke-test-${{ matrix.provider }}.sh
-
-  smoke-test-kv-custom-path:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        provider: [vault-custom-path, openbao-custom-path]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
+      - name: Install Playwright dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/tests/webhook/requirements.txt
+          python -m playwright install --with-deps chromium
 
       - name: Init Docker Swarm
         run: docker swarm init
 
       - name: Run smoke test for ${{ matrix.provider }}
         run: bash scripts/tests/smoke-test-${{ matrix.provider }}.sh
-
 
   smoke-test-awssm:
     runs-on: ubuntu-latest
