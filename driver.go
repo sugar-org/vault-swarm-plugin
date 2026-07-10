@@ -119,6 +119,27 @@ func NewDriver() (*SecretsDriver, error) {
 	// Start monitoring if rotation is enabled and provider supports it
 	if config.EnableRotation && provider.SupportsRotation() {
 		log.Infof("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
+	// Webhook vs Ticker decision
+	// USE_WEBHOOK=true is only honoured for the Vault provider.
+	// All other providers (AWS, Azure, OpenBao, GCP) always use the ticker.
+	if config.UseWebhook && config.ProviderType == "vault" {
+		log.Printf("USE_WEBHOOK=true detected for Vault provider — starting webhook server on port %d", config.WebhookPort)
+		webhookCfg := &providers.WebhookConfig{
+			Port:   config.WebhookPort,
+			Secret: config.WebhookSecret,
+		}
+		driver.webhookServer = providers.NewWebhookServer(webhookCfg, driver.ReconcileSecret)
+		go func() {
+			if err := driver.webhookServer.Start(); err != nil {
+				log.Errorf("Webhook server failed: %v", err)
+			}
+		}()
+	} else if config.EnableRotation && provider.SupportsRotation() {
+		// Existing ticker path — unchanged
+		if config.UseWebhook && config.ProviderType != "vault" {
+			log.Printf("USE_WEBHOOK=true is ignored for provider %s — falling back to ticker", config.ProviderType)
+		}
+		log.Printf("Starting secret rotation monitoring with interval: %v", config.RotationInterval)
 		go driver.startMonitoring()
 	} else if config.EnableRotation {
 		log.Warnf("Secret rotation is enabled but provider %s does not support rotation", config.ProviderType)
