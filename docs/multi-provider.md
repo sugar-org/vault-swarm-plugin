@@ -144,7 +144,54 @@ docker plugin set swarm-external-secrets:latest \
 
 ---
 
-### 5. GCP Secret Manager (Placeholder)
+### 5. Doppler
+
+**Provider Type:** `doppler`
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+|---|---|---|
+| `DOPPLER_TOKEN` | Doppler service token or CLI token (required) | — |
+| `DOPPLER_PROJECT` | Doppler project (required for non-service tokens) | — |
+| `DOPPLER_CONFIG` | Doppler config/environment (`dev`, `stg`, `prd`) | — |
+| `DOPPLER_API_URL` | Doppler API base URL | `https://api.doppler.com` |
+| `DOPPLER_CACHE_TTL` | Cache duration for config downloads | `30s` |
+
+**Authentication:**
+
+- **Service token (production):** `dp.st.*` tokens are scoped to a single project+config; `DOPPLER_PROJECT` and `DOPPLER_CONFIG` are optional.
+- **CLI/personal token (development):** requires `DOPPLER_PROJECT` and `DOPPLER_CONFIG`.
+
+**Example (service token):**
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="doppler" \
+    DOPPLER_TOKEN="dp.st.production.xxx" \
+    ENABLE_ROTATION="true" \
+    ROTATION_INTERVAL="30s"
+```
+
+**Example (CLI token for local development):**
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="doppler" \
+    DOPPLER_TOKEN="$(doppler configure get token --plain)" \
+    DOPPLER_PROJECT="my-api" \
+    DOPPLER_CONFIG="dev"
+```
+
+**Secret Labels:**
+
+- `doppler_secret_name` — Doppler secret key (e.g. `MYSQL_PASSWORD`)
+- `doppler_project` — Optional per-secret project override
+- `doppler_config` — Optional per-secret config override
+
+If `doppler_secret_name` is omitted, the Docker secret name is uppercased to match Doppler naming conventions (`mysql_password` → `MYSQL_PASSWORD`).
+
+---
+
+### 6. GCP Secret Manager (Placeholder)
 
 **Provider Type:** `gcp`
 
@@ -202,6 +249,23 @@ secrets:
       azure_secret_name: "database-connection-string"
       azure_field: "connection_string"
 ```
+
+### Doppler
+
+```yaml
+secrets:
+  mysql_password:
+    driver: swarm-external-secrets:latest
+    labels:
+      doppler_secret_name: "MYSQL_PASSWORD"
+
+  api_key:
+    driver: swarm-external-secrets:latest
+    labels:
+      doppler_secret_name: "API_KEY"
+```
+
+For multiple Doppler configs, run separate plugin instances with different service tokens (one token per project+config), similar to the Vault + OpenBao pattern above.
 
 ## Multiple Providers in the Same Swarm Cluster
 
@@ -297,6 +361,12 @@ secrets:
 - Fully compatible with Vault API
 - Use for Vault migration or open-source requirements
 - Supports all Vault authentication methods
+
+### Doppler
+- Uses the Doppler REST API (`/v3/configs/config/secrets/download`)
+- Service tokens are scoped to one project+config; use multiple plugin instances for multiple environments
+- Config downloads are cached (default 30s) to reduce API calls; rotation checks bypass the cache
+- Secret names default to the uppercased Docker secret name when `doppler_secret_name` is not set
 
 ### GCP Secret Manager
 - Currently a placeholder — will error on initialization

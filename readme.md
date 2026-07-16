@@ -4,7 +4,7 @@
 ---
 
 
-A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, and OpenBao.
+A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, and Doppler.
 
 ### 🚀 Updates
 
@@ -28,7 +28,7 @@ Please refer to the [docs](https://sugar-org.github.io/swarm-external-secrets/) 
 
 ## Features
 
-- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao
+- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, Doppler
 - **Multiple Auth Methods**: Support for various authentication methods per provider
 - **Automatic Secret Rotation**: Monitor providers for changes and automatically update Docker secrets and services
 - **Real-time Monitoring**: Web dashboard with system metrics, health status, and performance tracking
@@ -52,6 +52,9 @@ docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="azure"
 
 # OpenBao
 docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="openbao"
+
+# Doppler
+docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="doppler"
 ```
 
 For multi-instance usage (for example, Vault + OpenBao with separate plugin names in Swarm), see [`docs/multi-provider.md`](./docs/multi-provider.md).

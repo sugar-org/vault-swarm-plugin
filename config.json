@@ -262,6 +262,31 @@
       "name": "OPENBAO_SKIP_VERIFY",
       "description": "Skip TLS certificate verification for OpenBao (true/false)",
       "settable": ["value"]
+    },
+    {
+      "name": "DOPPLER_TOKEN",
+      "description": "Doppler service token or CLI token",
+      "settable": ["value"]
+    },
+    {
+      "name": "DOPPLER_PROJECT",
+      "description": "Doppler project (required for non-service tokens)",
+      "settable": ["value"]
+    },
+    {
+      "name": "DOPPLER_CONFIG",
+      "description": "Doppler config/environment (dev, stg, prd)",
+      "settable": ["value"]
+    },
+    {
+      "name": "DOPPLER_API_URL",
+      "description": "Doppler API base URL (default https://api.doppler.com)",
+      "settable": ["value"]
+    },
+    {
+      "name": "DOPPLER_CACHE_TTL",
+      "description": "Cache duration for Doppler config downloads (e.g. 30s, 1m)",
+      "settable": ["value"]
     }
   ]
 }
