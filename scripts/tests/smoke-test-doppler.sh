@@ -24,7 +24,7 @@ cleanup() {
     echo -e "${RED}Running Doppler smoke test cleanup...${DEF}"
     remove_stack "${STACK_NAME}"
     docker secret rm "${SECRET_NAME}" 2>/dev/null || true
-    if [ -n "${MOCK_SERVER_PID}" ]; then
+    if [[ -n "${MOCK_SERVER_PID}" ]]; then
         kill "${MOCK_SERVER_PID}" 2>/dev/null || true
         wait "${MOCK_SERVER_PID}" 2>/dev/null || true
     fi
