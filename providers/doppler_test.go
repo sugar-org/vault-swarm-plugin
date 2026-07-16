@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/go-plugins-helpers/secrets"
 )
@@ -174,7 +175,7 @@ func TestDopplerProviderCaching(t *testing.T) {
 	}
 }
 
-func TestDopplerProviderRotationBypassesCache(t *testing.T) {
+func TestDopplerProviderRefreshAfterCacheTTL(t *testing.T) {
 	t.Parallel()
 
 	state := &dopplerTestState{
@@ -191,7 +192,7 @@ func TestDopplerProviderRotationBypassesCache(t *testing.T) {
 		"DOPPLER_PROJECT":   "my-api",
 		"DOPPLER_CONFIG":    "dev",
 		"DOPPLER_API_URL":   server.URL,
-		"DOPPLER_CACHE_TTL": "1m",
+		"DOPPLER_CACHE_TTL": "50ms",
 	}); err != nil {
 		t.Fatalf("initialize failed: %v", err)
 	}
@@ -200,7 +201,6 @@ func TestDopplerProviderRotationBypassesCache(t *testing.T) {
 	secretInfo := &SecretInfo{
 		SecretPath:  "my-api/dev/ROTATE_ME",
 		SecretField: "ROTATE_ME",
-		LastHash:    "old-hash",
 	}
 
 	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
@@ -214,13 +214,25 @@ func TestDopplerProviderRotationBypassesCache(t *testing.T) {
 
 	state.secrets["ROTATE_ME"] = "v2"
 
+	// Within TTL, rotation checks should still see the cached value.
 	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("rotation GetSecret failed: %v", err)
+		t.Fatalf("cached GetSecret failed: %v", err)
+	} else if string(value) != "v1" {
+		t.Fatalf("expected cached value v1, got %q", string(value))
+	}
+	if state.requestCount != 1 {
+		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount)
+	}
+
+	time.Sleep(75 * time.Millisecond)
+
+	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
+		t.Fatalf("post-TTL GetSecret failed: %v", err)
 	} else if string(value) != "v2" {
-		t.Fatalf("expected fresh value v2, got %q", string(value))
+		t.Fatalf("expected refreshed value v2, got %q", string(value))
 	}
 	if state.requestCount != 2 {
-		t.Fatalf("expected cache bypass with 2 API calls, got %d", state.requestCount)
+		t.Fatalf("expected refresh after TTL with 2 API calls, got %d", state.requestCount)
 	}
 }
 
