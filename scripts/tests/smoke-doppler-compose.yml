@@ -21,7 +21,7 @@ services:
 
 secrets:
   smoke_secret:
-    driver: test-org/swarm-external-secrets:test
+    driver: swarm-external-secrets:latest
     labels:
       doppler_secret_name: "SMOKE_TEST_PASSWORD"
 
