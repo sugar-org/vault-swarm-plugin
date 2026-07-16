@@ -29,6 +29,7 @@ type DopplerProvider struct {
 	httpClient *http.Client
 	cache      map[dopplerCacheKey]dopplerCacheEntry
 	cacheMu    sync.RWMutex
+	fetchMu    sync.Mutex
 }
 
 // DopplerConfig holds configuration for the Doppler API client.
@@ -66,7 +67,10 @@ func (d *DopplerProvider) Initialize(config map[string]string) error {
 		cacheTTL = parsed
 	}
 
-	apiBaseURL := strings.TrimRight(utils.GetConfigOrDefault(config, "DOPPLER_API_URL", defaultDopplerAPIURL), "/")
+	apiBaseURL, err := validateDopplerAPIURL(utils.GetConfigOrDefault(config, "DOPPLER_API_URL", defaultDopplerAPIURL))
+	if err != nil {
+		return err
+	}
 
 	d.config = &DopplerConfig{
 		Token:      token,
@@ -92,11 +96,10 @@ func (d *DopplerProvider) Initialize(config map[string]string) error {
 func (d *DopplerProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
 	secretName := d.resolveSecretName(secretInfo)
 	project, configName := d.parseSecretPath(secretInfo.SecretPath)
-	bypassCache := secretInfo.LastHash != ""
 
 	log.Debugf("Reading secret from Doppler: %s (project=%s, config=%s)", secretName, project, configName)
 
-	secretsMap, err := d.getConfigSecrets(ctx, project, configName, bypassCache)
+	secretsMap, err := d.getConfigSecrets(ctx, project, configName)
 	if err != nil {
 		return nil, err
 	}
@@ -180,23 +183,55 @@ func isDopplerServiceToken(token string) bool {
 	return strings.HasPrefix(token, "dp.st.")
 }
 
+func validateDopplerAPIURL(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if raw == "" {
+		return "", fmt.Errorf("DOPPLER_API_URL is required")
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid DOPPLER_API_URL: %w", err)
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return "", fmt.Errorf("DOPPLER_API_URL must use http or https scheme")
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("DOPPLER_API_URL must include a host")
+	}
+	if parsed.User != nil {
+		return "", fmt.Errorf("DOPPLER_API_URL must not include userinfo")
+	}
+
+	return parsed.Scheme + "://" + parsed.Host + strings.TrimRight(parsed.EscapedPath(), "/"), nil
+}
+
 func (d *DopplerProvider) getConfigSecrets(
 	ctx context.Context,
 	project string,
 	configName string,
-	bypassCache bool,
 ) (map[string]string, error) {
 	cacheKey := dopplerCacheKey{project: project, config: configName}
 
-	if !bypassCache {
-		d.cacheMu.RLock()
-		if entry, ok := d.cache[cacheKey]; ok && time.Since(entry.fetchedAt) < d.config.CacheTTL {
-			cached := cloneSecretsMap(entry.secrets)
-			d.cacheMu.RUnlock()
-			return cached, nil
-		}
+	d.cacheMu.RLock()
+	if entry, ok := d.cache[cacheKey]; ok && time.Since(entry.fetchedAt) < d.config.CacheTTL {
+		cached := cloneSecretsMap(entry.secrets)
 		d.cacheMu.RUnlock()
+		return cached, nil
 	}
+	d.cacheMu.RUnlock()
+
+	d.fetchMu.Lock()
+	defer d.fetchMu.Unlock()
+
+	// Double-check after acquiring fetch lock so concurrent callers share one refresh.
+	d.cacheMu.RLock()
+	if entry, ok := d.cache[cacheKey]; ok && time.Since(entry.fetchedAt) < d.config.CacheTTL {
+		cached := cloneSecretsMap(entry.secrets)
+		d.cacheMu.RUnlock()
+		return cached, nil
+	}
+	d.cacheMu.RUnlock()
 
 	secretsMap, err := d.downloadSecrets(ctx, project, configName)
 	if err != nil {
@@ -236,7 +271,8 @@ func (d *DopplerProvider) downloadSecrets(ctx context.Context, project, configNa
 	req.Header.Set("Authorization", "Bearer "+d.config.Token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := d.httpClient.Do(req)
+	// URL is validated at Initialize from plugin admin config (http/https + host only).
+	resp, err := d.httpClient.Do(req) // #nosec G704
 	if err != nil {
 		return nil, fmt.Errorf("failed to call Doppler API: %w", err)
 	}
