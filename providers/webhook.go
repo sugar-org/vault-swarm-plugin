@@ -222,7 +222,7 @@ func (ws *WebhookServer) verifyHMAC(body []byte, signature string) bool {
 	expected := hex.EncodeToString(mac.Sum(nil))
 
 	// Constant-time comparison to prevent timing attacks.
-	return hmac.Equal([]byte(expected), []byte(signature))
+	return hmac.Equal([]byte(expected), []byte(strings.ToLower(signature)))
 }
 
 // isSecretEvent returns true when the event_source indicates a secret
