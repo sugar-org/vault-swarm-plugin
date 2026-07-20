@@ -36,6 +36,13 @@ type SecretsProvider interface {
 	Close() error
 }
 
+// CacheInvalidator(Only for Doppler) is an optional interface for providers that cache secret
+// lookups. When implemented, the driver drops cached data before a
+// webhook-triggered rotation check so the next read fetches fresh values.
+type CacheInvalidator interface {
+	InvalidateCache()
+}
+
 // ProviderConfig holds common configuration for all providers
 type ProviderConfig struct {
 	ProviderType     string            `json:"provider_type"`

@@ -16,6 +16,7 @@ import (
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/sugar-org/swarm-external-secrets/dopplerwebhook"
 	"github.com/sugar-org/swarm-external-secrets/internal/secrettransform"
 	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 	"github.com/sugar-org/swarm-external-secrets/monitoring"
@@ -30,10 +31,12 @@ type SecretsDriver struct {
 	transformer   secrettransform.Transformer      // aws kms service which decrypts ciphertexts
 	secretTracker map[string]*providers.SecretInfo // key: docker secret name
 	trackerMutex  sync.RWMutex
+	rotationMu    sync.Mutex // serializes rotation cycles (poll loop vs webhook)
 	monitorCtx    context.Context
 	monitorCancel context.CancelFunc
 	monitor       *monitoring.Monitor
 	webInterface  *monitoring.WebInterface
+	webhookServer *dopplerwebhook.Server
 }
 
 // SecretsConfig holds the configuration for the multi-provider driver
@@ -43,6 +46,10 @@ type SecretsConfig struct {
 	RotationInterval time.Duration
 	EnableMonitoring bool
 	MonitoringPort   int
+	WebhookEnable    bool
+	WebhookPort      int
+	WebhookPath      string
+	WebhookSecret    string
 	Settings         map[string]string
 }
 
@@ -68,6 +75,10 @@ func NewDriver() (*SecretsDriver, error) {
 		RotationInterval: utils.ParseDurationOrDefault(utils.GetEnvOrDefault("ROTATION_INTERVAL", "10s")),
 		EnableMonitoring: utils.GetEnvOrDefault("ENABLE_MONITORING", "true") == "true",
 		MonitoringPort:   utils.ParseIntOrDefault(utils.GetEnvOrDefault("MONITORING_PORT", "8080")),
+		WebhookEnable:    utils.GetEnvOrDefault("DOPPLER_WEBHOOK_ENABLE", "false") == "true",
+		WebhookPort:      utils.ParseIntOrDefault(utils.GetEnvOrDefault("DOPPLER_WEBHOOK_PORT", "8081")),
+		WebhookPath:      utils.GetEnvOrDefault("DOPPLER_WEBHOOK_PATH", "/webhooks/doppler"),
+		WebhookSecret:    utils.GetConfigOrDefault(settings, "DOPPLER_WEBHOOK_SECRET", ""),
 		Settings:         settings,
 	}
 
@@ -126,8 +137,38 @@ func NewDriver() (*SecretsDriver, error) {
 		log.Debug("Secret rotation monitoring is disabled")
 	}
 
+	// Start the webhook listener for event-driven rotation (e.g. Doppler).
+	if config.WebhookEnable {
+		driver.startWebhookServer()
+	}
+
 	log.Infof("Successfully initialized driver with %s provider", provider.GetProviderName())
 	return driver, nil
+}
+
+// startWebhookServer starts the HTTP listener that receives provider webhooks
+// (currently Doppler config.secrets.update) and triggers an immediate rotation
+// check, bypassing the poll interval.
+func (d *SecretsDriver) startWebhookServer() {
+	if !d.config.EnableRotation || !d.provider.SupportsRotation() {
+		log.Warnf("DOPPLER_WEBHOOK_ENABLE is set but provider %s cannot rotate (rotation disabled or unsupported); webhook events will have no effect", d.config.ProviderType)
+	}
+	if d.config.WebhookSecret == "" {
+		log.Warn("Webhook enabled without DOPPLER_WEBHOOK_SECRET: incoming requests will not be signature-verified (not recommended)")
+	}
+
+	addr := fmt.Sprintf(":%d", d.config.WebhookPort)
+	d.webhookServer = dopplerwebhook.New(addr, d.config.WebhookPath, d.config.WebhookSecret, d.handleWebhookEvent)
+	d.webhookServer.Start()
+}
+
+// handleWebhookEvent drops any cached provider secrets and runs a rotation
+// check. Invoked asynchronously by the webhook server after authentication.
+func (d *SecretsDriver) handleWebhookEvent(_ dopplerwebhook.Payload) {
+	if invalidator, ok := d.provider.(providers.CacheInvalidator); ok {
+		invalidator.InvalidateCache()
+	}
+	d.checkForSecretChanges()
 }
 
 // buildSecretInfo constructs a SecretInfo from the incoming request, using the
@@ -294,8 +335,14 @@ func (d *SecretsDriver) startMonitoring() {
 	}
 }
 
-// checkForSecretChanges monitors tracked secrets for changes
+// checkForSecretChanges monitors tracked secrets for changes.
+// The rotation mutex serializes whole cycles so a webhook-triggered check
+// cannot overlap a poll-triggered one (concurrent cycles could interleave the
+// create -> update -> remove rotation steps on the same secret).
 func (d *SecretsDriver) checkForSecretChanges() {
+	d.rotationMu.Lock()
+	defer d.rotationMu.Unlock()
+
 	d.trackerMutex.RLock()
 	secrets := make(map[string]*providers.SecretInfo, len(d.secretTracker))
 	maps.Copy(secrets, d.secretTracker)
@@ -582,6 +629,12 @@ func (d *SecretsDriver) Stop() error {
 	if d.webInterface != nil {
 		if err := d.webInterface.Stop(); err != nil {
 			log.Warnf("Error stopping web interface: %v", err)
+		}
+	}
+
+	if d.webhookServer != nil {
+		if err := d.webhookServer.Stop(); err != nil {
+			log.Warnf("Error stopping webhook server: %v", err)
 		}
 	}
 

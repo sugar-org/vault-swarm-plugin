@@ -140,6 +140,14 @@ func (d *DopplerProvider) Close() error {
 	return nil
 }
 
+// InvalidateCache drops all cached Doppler config downloads so the next read
+// fetches fresh values. Used for webhook-driven rotation.
+func (d *DopplerProvider) InvalidateCache() {
+	d.cacheMu.Lock()
+	d.cache = make(map[dopplerCacheKey]dopplerCacheEntry)
+	defer d.cacheMu.Unlock()
+}
+
 func (d *DopplerProvider) resolveSecretNameFromRequest(req secrets.Request) string {
 	if customName, exists := req.SecretLabels["doppler_secret_name"]; exists && customName != "" {
 		return customName
