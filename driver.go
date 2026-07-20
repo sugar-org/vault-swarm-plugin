@@ -165,6 +165,10 @@ func (d *SecretsDriver) startWebhookServer() {
 // handleWebhookEvent drops any cached provider secrets and runs a rotation
 // check. Invoked asynchronously by the webhook server after authentication.
 func (d *SecretsDriver) handleWebhookEvent(_ dopplerwebhook.Payload) {
+	if !d.config.EnableRotation || !d.provider.SupportsRotation() {
+		log.Debug("Webhook received but rotation is disabled or unsupported; ignoring")
+		return
+	}
 	if invalidator, ok := d.provider.(providers.CacheInvalidator); ok {
 		invalidator.InvalidateCache()
 	}
