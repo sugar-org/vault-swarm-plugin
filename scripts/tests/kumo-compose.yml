@@ -1,0 +1,11 @@
+services:
+  kumo:
+    image: ghcr.io/sivchari/kumo:latest
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4566/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
