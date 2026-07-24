@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -159,8 +160,8 @@ func TestDopplerProviderCaching(t *testing.T) {
 	if _, err := provider.GetSecret(ctx, secretInfo); err != nil {
 		t.Fatalf("first GetSecret failed: %v", err)
 	}
-	if state.requestCount != 1 {
-		t.Fatalf("expected 1 API call, got %d", state.requestCount)
+	if state.requestCount.Load() != 1 {
+		t.Fatalf("expected 1 API call, got %d", state.requestCount.Load())
 	}
 
 	state.secrets["CACHE_TEST"] = "v2"
@@ -170,8 +171,8 @@ func TestDopplerProviderCaching(t *testing.T) {
 	} else if string(value) != "v1" {
 		t.Fatalf("expected cached value v1, got %q", string(value))
 	}
-	if state.requestCount != 1 {
-		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount)
+	if state.requestCount.Load() != 1 {
+		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount.Load())
 	}
 }
 
@@ -208,8 +209,8 @@ func TestDopplerProviderRefreshAfterCacheTTL(t *testing.T) {
 	} else if string(value) != "v1" {
 		t.Fatalf("expected v1, got %q", string(value))
 	}
-	if state.requestCount != 1 {
-		t.Fatalf("expected 1 API call, got %d", state.requestCount)
+	if state.requestCount.Load() != 1 {
+		t.Fatalf("expected 1 API call, got %d", state.requestCount.Load())
 	}
 
 	state.secrets["ROTATE_ME"] = "v2"
@@ -220,8 +221,8 @@ func TestDopplerProviderRefreshAfterCacheTTL(t *testing.T) {
 	} else if string(value) != "v1" {
 		t.Fatalf("expected cached value v1, got %q", string(value))
 	}
-	if state.requestCount != 1 {
-		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount)
+	if state.requestCount.Load() != 1 {
+		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount.Load())
 	}
 
 	time.Sleep(75 * time.Millisecond)
@@ -231,8 +232,8 @@ func TestDopplerProviderRefreshAfterCacheTTL(t *testing.T) {
 	} else if string(value) != "v2" {
 		t.Fatalf("expected refreshed value v2, got %q", string(value))
 	}
-	if state.requestCount != 2 {
-		t.Fatalf("expected refresh after TTL with 2 API calls, got %d", state.requestCount)
+	if state.requestCount.Load() != 2 {
+		t.Fatalf("expected refresh after TTL with 2 API calls, got %d", state.requestCount.Load())
 	}
 }
 
@@ -262,7 +263,7 @@ func TestDopplerProviderBuildSecretPath(t *testing.T) {
 
 type dopplerTestState struct {
 	secrets      map[string]string
-	requestCount int
+	requestCount atomic.Int32
 }
 
 func (s *dopplerTestState) handler(w http.ResponseWriter, r *http.Request) {
@@ -275,7 +276,7 @@ func (s *dopplerTestState) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.requestCount++
+	s.requestCount.Add(1)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(s.secrets)
 }

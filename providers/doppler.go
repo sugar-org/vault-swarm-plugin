@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,6 +22,10 @@ const (
 	defaultDopplerAPIURL   = "https://api.doppler.com"
 	defaultDopplerCacheTTL = 30 * time.Second
 	dopplerDownloadPath    = "/v3/configs/config/secrets/download"
+
+	// maxDopplerResponseBytes caps how much of an API response we read into
+	// memory, guarding against a misbehaving or compromised server.
+	maxDopplerResponseBytes = 10 << 20 // 10 MiB
 )
 
 // DopplerProvider implements the SecretsProvider interface for Doppler.
@@ -140,12 +145,23 @@ func (d *DopplerProvider) Close() error {
 	return nil
 }
 
+// CacheInvalidator is an optional interface for providers that cache secret
+// lookups. When implemented, the driver drops cached data before a
+// webhook-triggered rotation check so the next read fetches fresh values.
+//
+// This is Doppler-only: DopplerProvider is the sole implementer, which is why
+// the interface lives here rather than in the shared interface.go. Other
+// providers don't cache, so the driver's type assertion simply skips them.
+type CacheInvalidator interface {
+	InvalidateCache()
+}
+
 // InvalidateCache drops all cached Doppler config downloads so the next read
 // fetches fresh values. Used for webhook-driven rotation.
 func (d *DopplerProvider) InvalidateCache() {
 	d.cacheMu.Lock()
-	d.cache = make(map[dopplerCacheKey]dopplerCacheEntry)
 	defer d.cacheMu.Unlock()
+	d.cache = make(map[dopplerCacheKey]dopplerCacheEntry)
 }
 
 func (d *DopplerProvider) resolveSecretNameFromRequest(req secrets.Request) string {
@@ -288,7 +304,7 @@ func (d *DopplerProvider) downloadSecrets(ctx context.Context, project, configNa
 		_ = resp.Body.Close()
 	}()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDopplerResponseBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Doppler response: %w", err)
 	}
@@ -306,12 +322,5 @@ func (d *DopplerProvider) downloadSecrets(ctx context.Context, project, configNa
 }
 
 func cloneSecretsMap(src map[string]string) map[string]string {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-	return dst
+	return maps.Clone(src)
 }

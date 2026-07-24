@@ -151,7 +151,8 @@ func NewDriver() (*SecretsDriver, error) {
 // check, bypassing the poll interval.
 func (d *SecretsDriver) startWebhookServer() {
 	if !d.config.EnableRotation || !d.provider.SupportsRotation() {
-		log.Warnf("DOPPLER_WEBHOOK_ENABLE is set but provider %s cannot rotate (rotation disabled or unsupported); webhook events will have no effect", d.config.ProviderType)
+		log.Warnf("DOPPLER_WEBHOOK_ENABLE is set but provider %s cannot rotate (rotation disabled or unsupported); webhook listener will not be started", d.config.ProviderType)
+		return
 	}
 	if d.config.WebhookSecret == "" {
 		log.Warn("Webhook enabled without DOPPLER_WEBHOOK_SECRET: incoming requests will not be signature-verified (not recommended)")
