@@ -31,7 +31,7 @@ aws_cmd() {
     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
     AWS_DEFAULT_REGION="${AWS_REGION}" \
-    aws --endpoint-url "${KUMO_ENDPOINT}" "$@"
+    aws --no-cli-pager --endpoint-url "${KUMO_ENDPOINT}" "$@"
 }
 
 # Cleanup trap
