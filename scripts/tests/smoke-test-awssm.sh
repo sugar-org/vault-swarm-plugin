@@ -11,7 +11,8 @@ source "${SCRIPT_DIR}/smoke-test-helper.sh"
 # It speaks the AWS Secrets Manager API on port 4566 and needs no auth token,
 # so the smoke test is reproducible for contributors, forks, and external PRs.
 KUMO_CONTAINER="smoke-kumo"
-KUMO_IMAGE="ghcr.io/sivchari/kumo:latest"
+# Pinned to an immutable digest (0.26.0) for reproducible CI; multi-arch (amd64/arm64).
+KUMO_IMAGE="ghcr.io/sivchari/kumo:0.26.0@sha256:e63054fbe10eb17b0c9142e937e11b3f4ee2709ac1c80035f3220542f3e5b045"
 KUMO_ENDPOINT="http://localhost:4566"
 AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="test"
@@ -38,7 +39,7 @@ cleanup() {
     echo -e "${RED}Running AWS Secrets Manager smoke test cleanup...${DEF}"
     remove_stack "${STACK_NAME}"
     docker secret rm "${SECRET_NAME}" 2>/dev/null || true
-    if [ -n "${KUMO_CONTAINER}" ]; then
+    if [[ -n "${KUMO_CONTAINER}" ]]; then
         docker stop "${KUMO_CONTAINER}" 2>/dev/null || true
         docker rm   "${KUMO_CONTAINER}" 2>/dev/null || true
     fi
@@ -67,7 +68,7 @@ elapsed=0
 until aws_cmd secretsmanager list-secrets >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 60 ] || die "Kumo did not become ready within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "Kumo did not become ready within 60s."
 done
 success "Kumo is ready."
 
