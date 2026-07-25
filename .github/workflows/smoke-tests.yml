@@ -52,16 +52,12 @@ jobs:
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.2
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-        env:
-          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
       - name: Init Docker Swarm
         run: docker swarm init
 
+      # Kumo is a lightweight open-source AWS emulator started by the smoke test
+      # itself, so no LocalStack auth token / license is required. The aws CLI is
+      # preinstalled on ubuntu-latest runners.
       - name: Run smoke test for awssm
         run: bash scripts/tests/smoke-test-awssm.sh
-        
+
