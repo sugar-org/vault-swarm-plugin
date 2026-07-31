@@ -43,6 +43,18 @@ assert_no_sensitive_rotation_metadata_logs() {
     if echo "${logs}" | grep -Fq "Detected change in secret:"; then
         die "Sensitive rotation metadata leaked into logs (found: 'Detected change in secret:')"
     fi
+    if echo "${logs}" | grep -Fq "Starting rotation for secret:"; then
+        die "Sensitive rotation metadata leaked into logs (found: 'Starting rotation for secret:')"
+    fi
+    if echo "${logs}" | grep -Fq "Successfully rotated secret:"; then
+        die "Sensitive rotation metadata leaked into logs (found: 'Successfully rotated secret:')"
+    fi
+    if echo "${logs}" | grep -Fq "Created new version of secret"; then
+        die "Sensitive rotation metadata leaked into logs (found: 'Created new version of secret')"
+    fi
+    if echo "${logs}" | grep -Fq "Updated services to use new secret"; then
+        die "Sensitive rotation metadata leaked into logs (found: 'Updated services to use new secret')"
+    fi
 
     return 0
 }
@@ -166,7 +178,7 @@ log_stack() {
     docker service logs "${stack_name}_${service_suffix}" 2>&1 || true
 }
 
-# Compare password == logged secret 
+# Compare the mounted secret without logging either value.
 verify_secret() {
     local stack_name="$1"
     local service_suffix="$2"
@@ -174,7 +186,7 @@ verify_secret() {
     local expected_value="$4"
     local timeout="${5:-60}"
 
-    info "Verifying secret '${secret_name}' matches expected value..."
+    info "Verifying mounted secret matches expected value..."
 
     local elapsed=0
     while [ "${elapsed}" -lt "${timeout}" ]; do
@@ -195,10 +207,8 @@ verify_secret() {
                 local expected_trimmed
                 expected_trimmed=$(echo "${expected_value}" | tr -d '[:space:]')
 
-                info "Expected: '${expected_trimmed}' | Got: '${actual}'"
-
                 if [ "${actual}" = "${expected_trimmed}" ]; then
-                    success "Secret '${secret_name}' verified: value matches expected."
+                    success "Mounted secret verified: value matches expected."
                     return 0
                 fi
             fi
@@ -207,7 +217,7 @@ verify_secret() {
         elapsed=$((elapsed + 5))
     done
 
-    die "Secret '${secret_name}' did not match expected value within ${timeout}s."
+    die "Mounted secret did not match expected value within ${timeout}s."
 }
 
 # Get the currently running container ID for a swarm service
