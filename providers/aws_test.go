@@ -14,17 +14,17 @@ import (
 type contextKey struct{}
 
 type fakeIdentityTokenSource struct {
-	ctx context.Context
+	contextValue any
 }
 
 func (s *fakeIdentityTokenSource) FetchIdentityToken(ctx context.Context) ([]byte, error) {
-	s.ctx = ctx
+	s.contextValue = ctx.Value(contextKey{})
 	return []byte("signed-jwt-svid"), nil
 }
 
 type fakeWebIdentityClient struct {
-	ctx   context.Context
-	input *sts.AssumeRoleWithWebIdentityInput
+	contextValue any
+	input        *sts.AssumeRoleWithWebIdentityInput
 }
 
 func (c *fakeWebIdentityClient) AssumeRoleWithWebIdentity(
@@ -32,7 +32,7 @@ func (c *fakeWebIdentityClient) AssumeRoleWithWebIdentity(
 	input *sts.AssumeRoleWithWebIdentityInput,
 	_ ...func(*sts.Options),
 ) (*sts.AssumeRoleWithWebIdentityOutput, error) {
-	c.ctx = ctx
+	c.contextValue = ctx.Value(contextKey{})
 	c.input = input
 	expiration := time.Now().Add(time.Hour)
 	return &sts.AssumeRoleWithWebIdentityOutput{
@@ -182,10 +182,10 @@ func TestSPIFFECredentialsProvider_Retrieve_PropagatesContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Retrieve() error = %v", err)
 	}
-	if tokenSource.ctx != ctx {
+	if tokenSource.contextValue != "request" {
 		t.Fatal("FetchIdentityToken() did not receive the request context")
 	}
-	if client.ctx != ctx {
+	if client.contextValue != "request" {
 		t.Fatal("AssumeRoleWithWebIdentity() did not receive the request context")
 	}
 	if got, want := aws.ToString(client.input.WebIdentityToken), "signed-jwt-svid"; got != want {

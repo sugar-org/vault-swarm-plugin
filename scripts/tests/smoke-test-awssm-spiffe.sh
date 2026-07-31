@@ -166,7 +166,7 @@ cleanup() {
     docker rm -f \
         "${SPIRE_AGENT_CONTAINER}" \
         "${SPIRE_SERVER_CONTAINER}" >/dev/null 2>&1 || true
-    if [ -n "${KUMO_CONTAINER}" ]; then
+    if [[ -n "${KUMO_CONTAINER}" ]]; then
         docker rm -f "${KUMO_CONTAINER}" >/dev/null 2>&1 || true
     fi
     docker network rm "${SPIRE_NETWORK}" >/dev/null 2>&1 || true
@@ -193,7 +193,7 @@ elapsed=0
 until curl -fsS "${KUMO_ENDPOINT}/health" >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 60 ] || die "Kumo did not become ready within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "Kumo did not become ready within 60s."
 done
 
 docker network create "${SPIRE_NETWORK}" >/dev/null
@@ -214,7 +214,7 @@ until docker exec "${SPIRE_SERVER_CONTAINER}" \
     -socketPath /tmp/spire-server/private/api.sock >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 60 ] || die "SPIRE Server did not become ready within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "SPIRE Server did not become ready within 60s."
 done
 
 docker exec "${SPIRE_SERVER_CONTAINER}" \
@@ -229,7 +229,7 @@ docker exec "${SPIRE_SERVER_CONTAINER}" \
     -output json |
     jq -r '.value' >"${SPIRE_BOOTSTRAP_DIR}/join-token"
 
-[ -s "${SPIRE_BOOTSTRAP_DIR}/join-token" ] || die "SPIRE Server did not issue a join token."
+[[ -s "${SPIRE_BOOTSTRAP_DIR}/join-token" ]] || die "SPIRE Server did not issue a join token."
 chmod 0644 "${SPIRE_BOOTSTRAP_DIR}/bootstrap.crt" "${SPIRE_BOOTSTRAP_DIR}/join-token"
 
 info "Starting the node-level SPIRE Agent..."
@@ -250,7 +250,7 @@ until docker run --rm -v "${SPIRE_SOCKET_DIR}:/socket:ro" alpine:latest \
     test -S /socket/api.sock >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 60 ] || die "SPIRE Agent did not create its Workload API socket within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "SPIRE Agent did not create its Workload API socket within 60s."
 done
 
 # UID-only selection is intentionally limited to this disposable smoke test.

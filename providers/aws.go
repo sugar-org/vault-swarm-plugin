@@ -28,11 +28,11 @@ const (
 	spiffeCredentialSource = "SPIFFEWebIdentity" // #nosec G101 -- AWS SDK source label, not a credential.
 )
 
-type identityTokenSource interface {
+type identityTokenFetcher interface {
 	FetchIdentityToken(ctx context.Context) ([]byte, error)
 }
 
-type webIdentityClient interface {
+type webIdentityRoleAssumer interface {
 	AssumeRoleWithWebIdentity(
 		ctx context.Context,
 		params *sts.AssumeRoleWithWebIdentityInput,
@@ -41,8 +41,8 @@ type webIdentityClient interface {
 }
 
 type spiffeCredentialsProvider struct {
-	client      webIdentityClient
-	tokenSource identityTokenSource
+	client      webIdentityRoleAssumer
+	tokenSource identityTokenFetcher
 	roleARN     string
 }
 
