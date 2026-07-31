@@ -274,6 +274,8 @@ func (a *AWSProvider) buildSPIFFECredentials(cfg aws.Config) (aws.CredentialsPro
 	a.tokenSource = tokenSource
 
 	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
+		// AssumeRoleWithWebIdentity does not require AWS SigV4 credentials.
+		o.Credentials = aws.AnonymousCredentials{}
 		if a.config.STSEndpoint != "" {
 			o.BaseEndpoint = aws.String(a.config.STSEndpoint)
 		}
