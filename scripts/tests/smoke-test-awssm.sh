@@ -2,7 +2,7 @@
 
 set -ex
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-REPO_ROOT="$(realpath -- "${SCRIPT_DIR}/../..")"
+REPO_ROOT="${GITHUB_WORKSPACE:-$(realpath -- "${SCRIPT_DIR}/../..")}" 
 # shellcheck source=smoke-test-helper.sh
 source "${SCRIPT_DIR}/smoke-test-helper.sh"
 
@@ -25,8 +25,10 @@ SECRET_VALUE="awssm-smoke-pass-v1"
 SECRET_VALUE_ROTATED="awssm-smoke-pass-v2"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-awssm-compose.yml"
 
-# Create director for plugin logs
-mkdir -p /run/swarm-external-secrets
+# Create directory for plugin logs using the repository root path
+PLUGIN_LOG_DIR="${REPO_ROOT}/logs"
+mkdir -p "${PLUGIN_LOG_DIR}"
+touch "${PLUGIN_LOG_DIR}/plugin.log"
 
 # Helper to run the AWS CLI against the Kumo endpoint. Kumo needs no real
 # credentials, but the CLI still requires values to sign the request.
@@ -95,7 +97,9 @@ docker plugin set "${PLUGIN_NAME}" \
     AWS_ENDPOINT_URL="${KUMO_ENDPOINT}" \
     ENABLE_ROTATION="true" \
     ROTATION_INTERVAL="10s" \
-    ENABLE_MONITORING="false"
+    ENABLE_MONITORING="false" \
+    PLUGIN_LOG_PATH="${PLUGIN_LOG_DIR}/plugin.log"
+
 success "Plugin configured with AWS Secrets Manager settings."
 
 # Enable plugin
