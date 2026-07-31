@@ -368,7 +368,7 @@ func (d *SecretsDriver) hasSecretChanged(secretInfo *providers.SecretInfo) bool 
 
 // rotateSecret handles the secret rotation process
 func (d *SecretsDriver) rotateSecret(secretInfo *providers.SecretInfo) error {
-	log.Info("Starting secret rotation")
+	log.Infof("Starting rotation for secret: %s", secretInfo.DockerSecretName)
 
 	// Get the new secret value from the provider using the existing SecretInfo
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -395,7 +395,7 @@ func (d *SecretsDriver) rotateSecret(secretInfo *providers.SecretInfo) error {
 	secretInfo.LastUpdated = time.Now()
 	d.trackerMutex.Unlock()
 
-	log.Info("Successfully rotated secret")
+	log.Infof("Successfully rotated secret: %s", secretInfo.DockerSecretName)
 	return nil
 }
 
@@ -440,7 +440,7 @@ func (d *SecretsDriver) updateDockerSecret(secretName string, newValue []byte) e
 		return fmt.Errorf("failed to create new secret version: %v", err)
 	}
 
-	log.Info("Created new Docker secret version")
+	log.Infof("Created new version of secret %s with name %s and ID: %s", secretName, newSecretName, createResponse.ID)
 
 	// Update all services that use this secret to point to the new version
 	if err := d.updateServicesSecretReference(secretName, existingSecret.ID, newSecretName, createResponse.ID); err != nil {
@@ -499,7 +499,7 @@ func (d *SecretsDriver) updateServicesSecretReference(oldSecretName, oldSecretID
 	}
 
 	if len(updatedServices) > 0 {
-		log.Infof("Updated %d services to use rotated secret", len(updatedServices))
+		log.Infof("Updated services to use new secret %s: %v", newSecretName, updatedServices)
 	}
 
 	return nil
