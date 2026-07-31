@@ -1,0 +1,11 @@
+name: Approved OSS exceptions
+description: |
+  Narrow, time-limited exceptions for reviewed transitive dependencies.
+exceptions:
+  # Required by the official go-spiffe JWT-SVID implementation. SafeDep reports
+  # no vulnerabilities or malware, but its maintenance score is currently zero.
+  - id: go-spiffe-zeebo-errs
+    ecosystem: go
+    name: github.com/zeebo/errs
+    version: 1.4.0
+    expires: 2026-10-31T00:00:00Z
