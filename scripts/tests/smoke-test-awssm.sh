@@ -25,6 +25,9 @@ SECRET_VALUE="awssm-smoke-pass-v1"
 SECRET_VALUE_ROTATED="awssm-smoke-pass-v2"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-awssm-compose.yml"
 
+# Create director for plugin logs
+mkdir -p /run/swarm-external-secrets
+
 # Helper to run the AWS CLI against the Kumo endpoint. Kumo needs no real
 # credentials, but the CLI still requires values to sign the request.
 aws_cmd() {
