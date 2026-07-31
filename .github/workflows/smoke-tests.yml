@@ -59,5 +59,4 @@ jobs:
       # itself, so no LocalStack auth token / license is required. The aws CLI is
       # preinstalled on ubuntu-latest runners.
       - name: Run smoke test for awssm
-        run: bash scripts/tests/smoke-test-awssm.sh
-
+        run: bash scripts/tests/smoke-test-awssm.
