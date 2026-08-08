@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-plugins-helpers/secrets"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/sugar-org/swarm-external-secrets/internal/utils"
@@ -146,12 +147,22 @@ func (d *SecretsDriver) buildSecretInfo(req secrets.Request) *providers.SecretIn
 	}
 }
 
+// shortID returns a short unique identifier used to correlate all log lines
+// belonging to a single secret resolution request, even when many requests
+// are being handled concurrently.
+func shortID() string {
+	return uuid.NewString()[:8]
+}
+
 // Get method implements the secrets.Driver interface
 func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
-	log.Debugf("Received secret request for: %s using provider: %s", req.SecretName, d.provider.GetProviderName())
+	reqID := shortID()
+	start := time.Now()
+	log.Debugf("[%s] received secret request for: %s using provider: %s", reqID, req.SecretName, d.provider.GetProviderName())
 
 	if req.SecretName == "" {
-		log.Warn("Get request rejected: secret name is required")
+		log.Warnf("[%s] get request rejected: secret name is required", reqID)
+		log.Debugf("[%s] secret resolution completed in %s", reqID, time.Since(start))
 		return secrets.Response{
 			Err: "secret name is required",
 		}
@@ -167,24 +178,25 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 	// Get secret from the provider
 	value, err := d.provider.GetSecret(ctx, secretInfo)
 	if err != nil {
-		log.Errorf("Error getting secret from provider %s for secret %s: %v", d.provider.GetProviderName(), req.SecretName, err)
+		log.Errorf("[%s] error getting secret from provider %s for secret %s: %v", reqID, d.provider.GetProviderName(), req.SecretName, err)
+		log.Debugf("[%s] secret resolution failed in %s", reqID, time.Since(start))
 		return secrets.Response{
 			Err: fmt.Sprintf("failed to get secret: %v", err),
 		}
 	}
 
-	log.Debugf("Successfully retrieved secret from %s provider", d.provider.GetProviderName())
+	log.Debugf("[%s] successfully retrieved secret from %s provider", reqID, d.provider.GetProviderName())
 
 	// Track this secret for monitoring if rotation is enabled
 	if d.config.EnableRotation && d.provider.SupportsRotation() {
-		d.trackSecret(secretInfo, value)
+		d.trackSecret(secretInfo, value, reqID)
 	}
 
 	// Determine if secret should be reusable (Docker DoNotReuse=true means do not cache/reuse)
 	doNotReuse := d.shouldNotReuse(req)
-	log.Debugf("Get secret %q: DoNotReuse=%v (Swarm may reuse cached value when false)", req.SecretName, doNotReuse)
+	log.Debugf("[%s] get secret %q: DoNotReuse=%v (Swarm may reuse cached value when false)", reqID, req.SecretName, doNotReuse)
 
-	log.Debug("Successfully returning secret value")
+	log.Debugf("[%s] successfully returning secret value in %s", reqID, time.Since(start))
 	return secrets.Response{
 		Value:      value,
 		DoNotReuse: doNotReuse,
@@ -217,15 +229,15 @@ func (d *SecretsDriver) shouldNotReuse(req secrets.Request) bool {
 }
 
 // trackSecret adds or updates a secret in the tracking system
-func (d *SecretsDriver) trackSecret(secretInfo *providers.SecretInfo, value []byte) {
+func (d *SecretsDriver) trackSecret(secretInfo *providers.SecretInfo, value []byte, reqID string) {
 	d.trackerMutex.Lock()
 	defer d.trackerMutex.Unlock()
 
 	// Calculate hash for change detection
 	hash := fmt.Sprintf("%x", sha256.Sum256(value))
 
-	log.Tracef("Current provider %s tracking secret: %s at path: %s",
-		secretInfo.Provider, secretInfo.DockerSecretName, secretInfo.SecretPath)
+	log.Tracef("[%s] current provider %s tracking secret: %s at path: %s",
+		reqID, secretInfo.Provider, secretInfo.DockerSecretName, secretInfo.SecretPath)
 
 	// If already tracking, update service names and hash
 	if existing, exists := d.secretTracker[secretInfo.DockerSecretName]; exists {
@@ -244,8 +256,8 @@ func (d *SecretsDriver) trackSecret(secretInfo *providers.SecretInfo, value []by
 		d.secretTracker[secretInfo.DockerSecretName] = secretInfo
 	}
 
-	log.Tracef("Tracking secret: %s -> %s (provider: %s, services: %v)",
-		secretInfo.DockerSecretName, secretInfo.SecretPath, secretInfo.Provider, secretInfo.ServiceNames)
+	log.Tracef("[%s] tracking secret: %s -> %s (provider: %s, services: %v)",
+		reqID, secretInfo.DockerSecretName, secretInfo.SecretPath, secretInfo.Provider, secretInfo.ServiceNames)
 }
 
 // startMonitoring starts the background monitoring goroutine
