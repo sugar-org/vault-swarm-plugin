@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -101,14 +102,19 @@ func (p *InfisicalProvider) GetSecret(ctx context.Context, secretInfo *SecretInf
 	if err != nil {
 		return nil, err
 	}
-	return []byte(value), nil
+
+	extracted, err := ExtractSecretValue(value, secretInfo.SecretField)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract secret value: %w", err)
+	}
+	return extracted, nil
 }
 
 // SupportsRotation indicates Infisical supports rotation monitoring.
 func (p *InfisicalProvider) SupportsRotation() bool { return true }
 
-// GetSecretFieldLabel returns the Infisical secret-name label key.
-func (p *InfisicalProvider) GetSecretFieldLabel() string { return "infisical_secret_name" }
+// GetSecretFieldLabel returns the label key used for JSON field extraction.
+func (p *InfisicalProvider) GetSecretFieldLabel() string { return "infisical_field" }
 
 // BuildSecretPath encodes project/env/folder/name for tracking.
 // Format: {projectID}/{environment}[/{folders...}]/{secretName}
@@ -135,9 +141,6 @@ func (p *InfisicalProvider) resolveSecretNameFromRequest(req secrets.Request) st
 }
 
 func (p *InfisicalProvider) resolveSecretName(secretInfo *SecretInfo) string {
-	if secretInfo.SecretField != "" && secretInfo.SecretField != "value" {
-		return secretInfo.SecretField
-	}
 	if name := secretInfo.Labels["infisical_secret_name"]; name != "" {
 		return name
 	}
@@ -311,7 +314,7 @@ func (p *InfisicalProvider) loginUniversalAuth(ctx context.Context) (string, int
 		return "", 0, fmt.Errorf("failed to encode Infisical login request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.config.SiteURL+infisicalLoginPath, strings.NewReader(string(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.config.SiteURL+infisicalLoginPath, bytes.NewReader(body))
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to create Infisical login request: %w", err)
 	}

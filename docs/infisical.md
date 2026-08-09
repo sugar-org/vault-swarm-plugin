@@ -62,6 +62,7 @@ docker plugin set swarm-external-secrets:latest \
 | Label | Description |
 |---|---|
 | `infisical_secret_name` | Infisical secret key (e.g. `MYSQL_PASSWORD`) |
+| `infisical_field` | Optional JSON field to extract when the Infisical value is a JSON object |
 | `infisical_project_id` | Optional per-secret project override |
 | `infisical_environment` | Optional per-secret environment override |
 | `infisical_secret_path` | Optional per-secret folder path override |
