@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        provider: [vault, openbao]
+        provider: [vault, openbao, infisical]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +22,16 @@ jobs:
         run: docker swarm init
 
       - name: Run smoke test for ${{ matrix.provider }}
+        # Infisical vars are only consumed by the infisical script (real account;
+        # no mock). Ignored by the other providers.
+        env:
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_SMOKE_TOKEN: ${{ secrets.INFISICAL_SMOKE_TOKEN }}
+          INFISICAL_SMOKE_CLIENT_ID: ${{ secrets.INFISICAL_SMOKE_CLIENT_ID }}
+          INFISICAL_SMOKE_CLIENT_SECRET: ${{ secrets.INFISICAL_SMOKE_CLIENT_SECRET }}
+          INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_SMOKE_ENVIRONMENT }}
+          INFISICAL_SECRET_PATH: ${{ vars.INFISICAL_SMOKE_SECRET_PATH }}
+          INFISICAL_SITE_URL: ${{ vars.INFISICAL_SMOKE_SITE_URL }}
         run: bash scripts/tests/smoke-test-${{ matrix.provider }}.sh
 
   smoke-test-kv-custom-path:

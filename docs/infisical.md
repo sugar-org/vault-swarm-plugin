@@ -111,6 +111,33 @@ Rotation uses the same poll-based path as other providers:
 
 Universal Auth access tokens are cached in-process and refreshed before expiry (and retried once on HTTP 401).
 
+## Smoke test
+
+End-to-end Swarm smoke coverage (fetch + rotation) lives in `scripts/tests/smoke-test-infisical.sh`.
+
+This test talks to a **real Infisical project** (free cloud account is fine). There is no mock server.
+
+Required:
+
+| Variable | Description |
+|---|---|
+| `INFISICAL_PROJECT_ID` | Project that the smoke identity can read/write |
+| `INFISICAL_SMOKE_TOKEN` | Access/service token with secret CRUD **or** |
+| `INFISICAL_SMOKE_CLIENT_ID` / `INFISICAL_SMOKE_CLIENT_SECRET` | Universal Auth machine identity with secret CRUD |
+
+Optional: `INFISICAL_ENVIRONMENT` (default `dev`), `INFISICAL_SECRET_PATH` (default `/`), `INFISICAL_SITE_URL`.
+
+```bash
+export INFISICAL_PROJECT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export INFISICAL_SMOKE_CLIENT_ID="..."
+export INFISICAL_SMOKE_CLIENT_SECRET="..."
+# optional: export INFISICAL_ENVIRONMENT=dev
+
+bash scripts/tests/smoke-test-infisical.sh
+```
+
+The script seeds a unique secret, deploys a Swarm stack through the plugin, verifies the value, rotates the secret in Infisical, and verifies cutover. Cleanup deletes the seeded secret.
+
 ## Implementation notes
 
 - Uses the Infisical REST API directly (no SDK dependency).
