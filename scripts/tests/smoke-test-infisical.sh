@@ -59,6 +59,12 @@ infisical_require_creds() {
     die "Set INFISICAL_SMOKE_TOKEN, or INFISICAL_SMOKE_CLIENT_ID + INFISICAL_SMOKE_CLIENT_SECRET (free Infisical account)."
 }
 
+# Extract a JSON string field value (first match). Smoke values/tokens have no embedded quotes.
+infisical_json_string() {
+    local json="$1" key="$2"
+    printf '%s' "${json}" | sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" | head -1
+}
+
 infisical_login() {
     if [[ -n "${INFISICAL_SMOKE_TOKEN}" ]]; then
         INFISICAL_ACCESS_TOKEN="${INFISICAL_SMOKE_TOKEN}"
@@ -71,16 +77,7 @@ infisical_login() {
         -H "Accept: application/json" \
         -d "{\"clientId\":\"${INFISICAL_SMOKE_CLIENT_ID}\",\"clientSecret\":\"${INFISICAL_SMOKE_CLIENT_SECRET}\"}")"
 
-    INFISICAL_ACCESS_TOKEN="$(INFISICAL_LOGIN_JSON="${resp}" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ["INFISICAL_LOGIN_JSON"])
-token = payload.get("accessToken") or ""
-if not token:
-    sys.stderr.write("Infisical login response missing accessToken\n")
-    sys.exit(1)
-print(token)
-PY
-)"
+    INFISICAL_ACCESS_TOKEN="$(infisical_json_string "${resp}" "accessToken")"
     [[ -n "${INFISICAL_ACCESS_TOKEN}" ]] || die "Failed to obtain Infisical access token."
 }
 
@@ -101,42 +98,22 @@ infisical_api() {
     fi
 }
 
-infisical_scope_json() {
-    # Shared JSON fields for create/update/delete/get bodies and query.
-    printf '{"projectId":"%s","environment":"%s","secretPath":"%s"}' \
-        "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENVIRONMENT}" "${INFISICAL_SECRET_PATH}"
-}
-
-infisical_get_secret_value() {
-    local name="$1"
-    local qs
-    qs="projectId=${INFISICAL_PROJECT_ID}&environment=${INFISICAL_ENVIRONMENT}&secretPath=${INFISICAL_SECRET_PATH}&viewSecretValue=true"
-    local resp
-    resp="$(infisical_api GET "/api/v4/secrets/${name}?${qs}")"
-    INFISICAL_GET_JSON="${resp}" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ["INFISICAL_GET_JSON"])
-secret = payload.get("secret") or {}
-value = secret.get("secretValue")
-if value is None:
-    sys.stderr.write("Infisical GET response missing secret.secretValue\n")
-    sys.exit(1)
-print(value)
-PY
+infisical_secret_body() {
+    # Optional secretValue as $1. Smoke inputs are alphanumeric / path-safe.
+    if [[ $# -ge 1 ]]; then
+        printf '{"projectId":"%s","environment":"%s","secretPath":"%s","secretValue":"%s"}' \
+            "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENVIRONMENT}" "${INFISICAL_SECRET_PATH}" "$1"
+    else
+        printf '{"projectId":"%s","environment":"%s","secretPath":"%s"}' \
+            "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENVIRONMENT}" "${INFISICAL_SECRET_PATH}"
+    fi
 }
 
 # Create or update (upsert) a secret value.
 infisical_seed_secret() {
     local name="$1" value="$2"
-    local scope body status
-    scope="$(infisical_scope_json)"
-    body="$(SCOPE_JSON="${scope}" SECRET_VALUE="${value}" python3 - <<'PY'
-import json, os
-scope = json.loads(os.environ["SCOPE_JSON"])
-scope["secretValue"] = os.environ["SECRET_VALUE"]
-print(json.dumps(scope))
-PY
-)"
+    local body status
+    body="$(infisical_secret_body "${value}")"
 
     status="$(curl -sS -o /dev/null -w '%{http_code}' \
         -X GET "${INFISICAL_SITE_URL}/api/v4/secrets/${name}?projectId=${INFISICAL_PROJECT_ID}&environment=${INFISICAL_ENVIRONMENT}&secretPath=${INFISICAL_SECRET_PATH}&viewSecretValue=true" \
@@ -156,7 +133,7 @@ PY
 infisical_delete_secret() {
     local name="$1"
     local body
-    body="$(infisical_scope_json)"
+    body="$(infisical_secret_body)"
     curl -fsS -X DELETE "${INFISICAL_SITE_URL}/api/v4/secrets/${name}" \
         -H "Authorization: Bearer ${INFISICAL_ACCESS_TOKEN}" \
         -H "Content-Type: application/json" \
@@ -164,9 +141,15 @@ infisical_delete_secret() {
         -d "${body}" >/dev/null 2>&1 || true
 }
 
+# Same idea as Doppler: wait until the seeded value appears in the API response.
 infisical_wait_readable() {
-    local value="$1" timeout="${2:-30}" elapsed=0 actual=""
-    until actual="$(infisical_get_secret_value "${SECRET_KEY}" 2>/dev/null)" && [[ "${actual}" == "${value}" ]]; do
+    local value="$1" timeout="${2:-30}" elapsed=0
+    local qs="projectId=${INFISICAL_PROJECT_ID}&environment=${INFISICAL_ENVIRONMENT}&secretPath=${INFISICAL_SECRET_PATH}&viewSecretValue=true"
+    until curl -fsS \
+        -H "Authorization: Bearer ${INFISICAL_ACCESS_TOKEN}" \
+        -H "Accept: application/json" \
+        "${INFISICAL_SITE_URL}/api/v4/secrets/${SECRET_KEY}?${qs}" \
+        | grep -q "${value}"; do
         sleep 2
         elapsed=$((elapsed + 2))
         [[ "${elapsed}" -lt "${timeout}" ]] || die "Seeded Infisical secret did not become readable within ${timeout}s."
