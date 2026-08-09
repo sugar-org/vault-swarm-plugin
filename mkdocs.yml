@@ -59,6 +59,7 @@ markdown_extensions:
 nav:
   - index.md
   - Providers:
+      - Infisical: infisical.md
       - GCP Secret Manager: gcp.md
   - Multi-Provider: multi-provider.md
   - Monitoring: monitoring.md

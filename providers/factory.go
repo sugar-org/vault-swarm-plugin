@@ -18,6 +18,8 @@ func CreateProvider(providerType string) (SecretsProvider, error) {
 		return &AzureProvider{}, nil
 	case "openbao":
 		return &OpenBaoProvider{}, nil
+	case "infisical":
+		return &InfisicalProvider{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)
 	}
@@ -31,6 +33,7 @@ func GetSupportedProviders() []string {
 		"gcp",
 		"azure",
 		"openbao",
+		"infisical",
 	}
 }
 
@@ -68,6 +71,12 @@ func GetProviderInfo(providerType string) (map[string]string, error) {
 		info["description"] = "OpenBao secrets engine (Vault-compatible)"
 		info["auth_methods"] = "token, approle, jwt"
 		info["env_vars"] = "OPENBAO_ADDR, OPENBAO_TOKEN, OPENBAO_MOUNT_PATH, OPENBAO_AUTH_METHOD, OPENBAO_ROLE_ID, OPENBAO_SECRET_ID, OPENBAO_APPROLE_AUTH_PATH, OPENBAO_JWT_ROLE, OPENBAO_JWT, OPENBAO_JWT_FILE, OPENBAO_JWT_AUTH_PATH"
+
+	case "infisical":
+		info["name"] = "Infisical"
+		info["description"] = "Infisical secrets management platform"
+		info["auth_methods"] = "universal auth (machine identity), access token"
+		info["env_vars"] = "INFISICAL_TOKEN, INFISICAL_CLIENT_ID, INFISICAL_CLIENT_SECRET, INFISICAL_PROJECT_ID, INFISICAL_ENVIRONMENT, INFISICAL_SECRET_PATH, INFISICAL_SITE_URL"
 
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)
