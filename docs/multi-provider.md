@@ -180,10 +180,10 @@ docker plugin set swarm-external-secrets:latest \
 **Secret Labels:**
 
 - `infisical_secret_name` — Infisical secret key (e.g. `MYSQL_PASSWORD`)
+- `infisical_field` — Optional JSON field to extract from the secret value (defaults to `value`)
 - `infisical_project_id` — Optional per-secret project override
 - `infisical_environment` — Optional per-secret environment override
 - `infisical_secret_path` — Optional per-secret folder path override
-
 If `infisical_secret_name` is omitted, the Docker secret name is uppercased (`mysql_password` → `MYSQL_PASSWORD`).
 
 See [`docs/infisical.md`](./infisical.md) for machine-identity setup and smoke-test details.
