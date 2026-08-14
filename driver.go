@@ -300,7 +300,7 @@ func (d *SecretsDriver) checkForSecretChanges() {
 				return
 			}
 
-			log.Infof("Detected change in secret: %s", secretName)
+			log.Tracef("Detected change in secret: %s", secretName)
 			d.handleSecretRotationResult(secretName, secretInfo)
 		}(secretName, secretInfo)
 	}
