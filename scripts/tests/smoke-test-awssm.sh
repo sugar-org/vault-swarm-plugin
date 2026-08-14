@@ -2,13 +2,18 @@
 
 set -ex
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-REPO_ROOT="$(realpath -- "${SCRIPT_DIR}/../..")"
+REPO_ROOT="${GITHUB_WORKSPACE:-$(realpath -- "${SCRIPT_DIR}/../..")}" 
 # shellcheck source=smoke-test-helper.sh
 source "${SCRIPT_DIR}/smoke-test-helper.sh"
 
 # Configuration
-LOCALSTACK_CONTAINER="smoke-localstack"
-LOCALSTACK_ENDPOINT="http://localhost:4566"
+# Kumo is a lightweight open-source AWS emulator (https://github.com/sivchari/kumo).
+# It speaks the AWS Secrets Manager API on port 4566 and needs no auth token,
+# so the smoke test is reproducible for contributors, forks, and external PRs.
+KUMO_CONTAINER="smoke-kumo"
+# Pinned to an immutable digest (0.26.0) for reproducible CI; multi-arch (amd64/arm64).
+KUMO_IMAGE="ghcr.io/sivchari/kumo:0.26.0@sha256:e63054fbe10eb17b0c9142e937e11b3f4ee2709ac1c80035f3220542f3e5b045"
+KUMO_ENDPOINT="http://localhost:4566"
 AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="test"
 AWS_SECRET_ACCESS_KEY="test"
@@ -20,16 +25,13 @@ SECRET_VALUE="awssm-smoke-pass-v1"
 SECRET_VALUE_ROTATED="awssm-smoke-pass-v2"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-awssm-compose.yml"
 
-# Helper to run awslocal either on host or inside container
-awslocal_cmd() {
-    if [ -n "${LOCALSTACK_CONTAINER}" ]; then
-        docker exec "${LOCALSTACK_CONTAINER}" awslocal "$@"
-    else
-        AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-        AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-        AWS_DEFAULT_REGION="${AWS_REGION}" \
-        awslocal "$@"
-    fi
+# Helper to run the AWS CLI against the Kumo endpoint. Kumo needs no real
+# credentials, but the CLI still requires values to sign the request.
+aws_cmd() {
+    AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+    AWS_DEFAULT_REGION="${AWS_REGION}" \
+    aws --no-cli-pager --endpoint-url "${KUMO_ENDPOINT}" "$@"
 }
 
 # Cleanup trap
@@ -37,40 +39,42 @@ cleanup() {
     echo -e "${RED}Running AWS Secrets Manager smoke test cleanup...${DEF}"
     remove_stack "${STACK_NAME}"
     docker secret rm "${SECRET_NAME}" 2>/dev/null || true
-    if [ -n "${LOCALSTACK_CONTAINER}" ]; then
-        docker stop "${LOCALSTACK_CONTAINER}" 2>/dev/null || true
-        docker rm   "${LOCALSTACK_CONTAINER}" 2>/dev/null || true
+    if [[ -n "${KUMO_CONTAINER}" ]]; then
+        docker stop "${KUMO_CONTAINER}" 2>/dev/null || true
+        docker rm   "${KUMO_CONTAINER}" 2>/dev/null || true
     fi
     remove_plugin
 }
 trap cleanup EXIT
 
-# Start LocalStack container (skip if already running, e.g. in CI)
-if curl -s "${LOCALSTACK_ENDPOINT}/_localstack/health" >/dev/null 2>&1; then
-    info "LocalStack already running, skipping container start."
-    LOCALSTACK_CONTAINER=""
+command -v aws >/dev/null 2>&1 || die "aws CLI is required to run the AWS Secrets Manager smoke test."
+
+# Start Kumo container (skip if an emulator is already serving on 4566, e.g. in CI)
+if aws_cmd secretsmanager list-secrets >/dev/null 2>&1; then
+    info "AWS emulator already running on 4566, skipping container start."
+    KUMO_CONTAINER=""
 else
-    info "Starting LocalStack container..."
+    info "Starting Kumo AWS emulator container..."
     docker run -d \
-        --name "${LOCALSTACK_CONTAINER}" \
+        --name "${KUMO_CONTAINER}" \
         -p 4566:4566 \
-        -e SERVICES=secretsmanager \
-        localstack/localstack:latest
+        "${KUMO_IMAGE}"
 fi
 
-# Wait for LocalStack to be ready
-info "Waiting for LocalStack to be ready..."
+# Wait for Kumo to be ready. Kumo has no dedicated health endpoint, so we probe
+# the Secrets Manager API directly until it answers.
+info "Waiting for Kumo to be ready..."
 elapsed=0
-until curl -s "${LOCALSTACK_ENDPOINT}/_localstack/health" | grep -q "available" 2>/dev/null; do
+until aws_cmd secretsmanager list-secrets >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [ "${elapsed}" -lt 60 ] || die "LocalStack did not become ready within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "Kumo did not become ready within 60s."
 done
-success "LocalStack is ready."
+success "Kumo is ready."
 
 # Write test secret
 info "Writing test secret to AWS Secrets Manager..."
-awslocal_cmd secretsmanager create-secret \
+aws_cmd secretsmanager create-secret \
     --region "${AWS_REGION}" \
     --name "${SECRET_PATH}" \
     --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_VALUE}\"}"
@@ -85,10 +89,11 @@ docker plugin set "${PLUGIN_NAME}" \
     AWS_REGION="${AWS_REGION}" \
     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-    AWS_ENDPOINT_URL="${LOCALSTACK_ENDPOINT}" \
+    AWS_ENDPOINT_URL="${KUMO_ENDPOINT}" \
     ENABLE_ROTATION="true" \
     ROTATION_INTERVAL="10s" \
     ENABLE_MONITORING="false"
+
 success "Plugin configured with AWS Secrets Manager settings."
 
 # Enable plugin
@@ -111,7 +116,7 @@ verify_secret "${STACK_NAME}" "app" "${SECRET_NAME}" "${SECRET_VALUE}" 60
 
 # Rotate the password and verify
 info "Rotating secret in AWS Secrets Manager..."
-awslocal_cmd secretsmanager put-secret-value \
+aws_cmd secretsmanager put-secret-value \
     --region "${AWS_REGION}" \
     --secret-id "${SECRET_PATH}" \
     --secret-string "{\"${SECRET_FIELD}\":\"${SECRET_VALUE_ROTATED}\"}"
