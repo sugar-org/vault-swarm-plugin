@@ -106,16 +106,15 @@ enable_plugin() {
 
 ensure_plugin_mount_dir() {
     local dir="/run/swarm-external-secrets"
-    if [ -d "${dir}" ]; then
+    if [[ -d "${dir}" ]]; then
         return 0
     fi
     info "Creating plugin mount source ${dir}..."
-    if [ "$(id -u)" -eq 0 ]; then
+    # Directory only needs to exist for the bind mount; Docker daemon is root.
+    if [[ "$(id -u)" -eq 0 ]]; then
         mkdir -p "${dir}"
-        chmod 777 "${dir}"
     elif command -v sudo >/dev/null 2>&1; then
         sudo mkdir -p "${dir}"
-        sudo chmod 777 "${dir}"
     else
         die "Need ${dir} for plugin bind mount (create it as root)."
     fi
