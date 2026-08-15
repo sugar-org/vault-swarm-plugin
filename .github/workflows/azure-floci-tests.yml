@@ -1,0 +1,40 @@
+name: Azure Floci Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, alpha/provider-integration]
+
+jobs:
+  azure-floci-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AZURE_ENDPOINT: http://localhost:4577
+      AZURE_VAULT_URL: https://localhost:4577/devstoreaccount1-keyvault
+      AZURE_AUTHORITY_HOST: http://localhost:4577
+      AZURE_TENANT_ID: 00000000-0000-0000-0000-000000000002
+      AZURE_CLIENT_ID: 11111111-1111-1111-1111-111111111111
+      AZURE_CLIENT_SECRET: floci-az-dev-secret
+      AZURE_INSECURE_HTTP: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Init Docker Swarm
+        run: docker swarm init
+
+      # floci-az is started by the smoke test itself, so no separate emulator
+      # startup step is needed. The test uses the preinstalled curl to interact
+      # with the Key Vault REST API directly.
+      - name: Run Azure Key Vault smoke test
+        run: bash scripts/tests/smoke-test-azure.sh
+
+      - name: floci-az logs
+        if: failure()
+        run: docker logs smoke-floci-az

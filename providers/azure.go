@@ -3,10 +3,12 @@ package providers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os" // Imported to read environment variables
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore" // Imported for credentials
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/docker/go-plugins-helpers/secrets"
@@ -22,6 +24,8 @@ type AzureProvider struct {
 // AzureConfig holds the configuration for the Azure Key Vault client.
 type AzureConfig struct {
 	VaultURL string
+	// InsecureAllowHTTP allows HTTP connections to the vault (for local emulators like floci-az).
+	InsecureAllowHTTP bool
 }
 
 // Initialize sets up the Azure provider with the given configuration.
@@ -38,6 +42,10 @@ func (az *AzureProvider) Initialize(config map[string]string) error {
 		az.config.VaultURL += "/"
 	}
 
+	// Allow HTTP for local emulators like floci-az (opt-in via config or env).
+	insecureHTTP := config["AZURE_INSECURE_HTTP"] == "true" || os.Getenv("AZURE_INSECURE_HTTP") == "true"
+	az.config.InsecureAllowHTTP = insecureHTTP
+
 	var cred azcore.TokenCredential
 	var err error
 
@@ -48,7 +56,16 @@ func (az *AzureProvider) Initialize(config map[string]string) error {
 
 	if tenantID != "" && clientID != "" && clientSecret != "" {
 		log.Info("Authenticating with Azure using Service Principal credentials.")
-		cred, err = azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+		credOpts := &azidentity.ClientSecretCredentialOptions{
+			DisableInstanceDiscovery: insecureHTTP,
+		}
+		if insecureHTTP {
+			credOpts.Cloud.ActiveDirectoryAuthorityHost = os.Getenv("AZURE_AUTHORITY_HOST")
+			if credOpts.Cloud.ActiveDirectoryAuthorityHost == "" {
+				credOpts.Cloud.ActiveDirectoryAuthorityHost = "http://localhost:4577"
+			}
+		}
+		cred, err = azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, credOpts)
 		if err != nil {
 			return fmt.Errorf("failed to create Azure credential using Service Principal: %w", err)
 		}
@@ -62,7 +79,13 @@ func (az *AzureProvider) Initialize(config map[string]string) error {
 	}
 
 	// Create a new secret client to interact with the Key Vault.
-	client, err := azsecrets.NewClient(az.config.VaultURL, cred, nil)
+	clientOpts := &azsecrets.ClientOptions{}
+	if insecureHTTP {
+		clientOpts.DisableChallengeResourceVerification = true
+		clientOpts.InsecureAllowCredentialWithHTTP = true
+		clientOpts.Transport = &forceHTTPTransport{}
+	}
+	client, err := azsecrets.NewClient(az.config.VaultURL, cred, clientOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create Azure Key Vault client: %w", err)
 	}
@@ -147,3 +170,18 @@ func (az *AzureProvider) Close() error {
 	// The Azure SDK client does not require an explicit close operation.
 	return nil
 }
+
+// forceHTTPTransport rewrites HTTPS requests to HTTP. The Azure Key Vault SDK
+// enforces HTTPS, but local emulators like floci-az serve HTTP only. This
+// transport transparently downgrades the scheme before sending the request.
+type forceHTTPTransport struct{}
+
+func (t *forceHTTPTransport) Do(req *http.Request) (*http.Response, error) {
+	if req.URL.Scheme == "https" {
+		req.URL.Scheme = "http"
+	}
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+// Ensure forceHTTPTransport satisfies policy.Transporter.
+var _ policy.Transporter = (*forceHTTPTransport)(nil)
