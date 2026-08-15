@@ -3,9 +3,3 @@ services:
     image: floci/floci:1.6.0@sha256:eab36252ea43a4a73928423f0372219052c5c6f87207f6c4754db14b91d6ed30
     ports:
       - "4566:4566"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4566/_localstack/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s

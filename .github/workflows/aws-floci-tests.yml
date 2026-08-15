@@ -20,13 +20,22 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The floci native image ships no shell tools, so readiness is probed
+      # from the runner via the LocalStack-compatible health endpoint.
       - name: Start Floci
         run: |
-          docker compose -f scripts/tests/floci-compose.yml up -d --wait --wait-timeout 30 || {
-            echo "Floci did not become healthy within 30s"
-            docker compose -f scripts/tests/floci-compose.yml logs
-            exit 1
-          }
+          docker compose -f scripts/tests/floci-compose.yml up -d
+          elapsed=0
+          until curl -sf http://localhost:4566/_localstack/health >/dev/null 2>&1; do
+            sleep 2
+            elapsed=$((elapsed + 2))
+            if [[ "${elapsed}" -ge 30 ]]; then
+              echo "Floci did not become healthy within 30s"
+              docker compose -f scripts/tests/floci-compose.yml logs
+              exit 1
+            fi
+          done
+          echo "Floci is ready."
 
       - name: Run Floci tests
         env:
