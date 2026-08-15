@@ -6,7 +6,45 @@ on:
     branches: [main, alpha/provider-integration, feat/oci-provider]
 
 jobs:
-  oci-floci-tests:
+  # AWS-style: start the emulator and exercise Vault + KMS crypto + secret
+  # bundles with curl (no plugin build). See
+  # https://floci.io/floci-oci/services/kms-vault/
+  oci-kms-vault-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OCI_ENDPOINT: http://localhost:4599
+      OCI_TENANCY_OCID: ocid1.tenancy.oc1..flocilocaltenancy0000000000000000000000000000000000000000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Start floci-oci
+        run: |
+          docker compose -f scripts/tests/floci-oci-compose.yml up -d
+          elapsed=0
+          until curl -sf http://localhost:4599/_floci-oci/health >/dev/null 2>&1; do
+            sleep 2
+            elapsed=$((elapsed + 2))
+            if [[ "${elapsed}" -ge 30 ]]; then
+              echo "floci-oci did not become healthy within 30s"
+              docker compose -f scripts/tests/floci-oci-compose.yml logs
+              exit 1
+            fi
+          done
+          echo "floci-oci is ready."
+
+      - name: Verify OCI KMS Vault + Secrets roundtrip
+        run: bash scripts/tests/floci-oci-roundtrip.sh
+
+      - name: floci-oci logs
+        if: failure()
+        run: docker compose -f scripts/tests/floci-oci-compose.yml logs
+
+  # Azure/GCP-style: Swarm plugin smoke against the same emulator.
+  oci-floci-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -26,8 +64,6 @@ jobs:
       - name: Init Docker Swarm
         run: docker swarm init
 
-      # floci-oci is started by the smoke test itself. The test uses curl
-      # against the Vault/KMS/Secrets REST APIs; the OCI CLI is not required.
       - name: Run OCI Vault smoke test
         run: bash scripts/tests/smoke-test-oci.sh
 

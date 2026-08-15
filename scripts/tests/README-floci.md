@@ -30,10 +30,35 @@ bash scripts/tests/floci-kms-roundtrip.sh
 
 ## OCI
 
-The `oci-floci-tests` workflow (`.github/workflows/oci-floci-tests.yml`) uses [floci-oci](https://floci.io/floci-oci/) on port 4599. The smoke test (`scripts/tests/smoke-test-oci.sh`):
+The `oci-floci-tests` workflow (`.github/workflows/oci-floci-tests.yml`) uses [floci-oci](https://floci.io/floci-oci/) on port 4599. Vault, KMS, and Secrets share one host; see [Vault, KMS and Secrets](https://floci.io/floci-oci/services/kms-vault/).
 
-1. starts `floci/floci-oci` unless `http://localhost:4599/_floci-oci/health` already succeeds
-2. creates a vault, AES key, and secret (JSON `password` field)
+### KMS Vault roundtrip (no plugin)
+
+`scripts/tests/floci-oci-roundtrip.sh` is the OCI counterpart of `floci-kms-roundtrip.sh`:
+
+1. creates a DEFAULT vault and an AES-256 SOFTWARE key
+2. encrypts a test password with KMS (`POST /20180608/encrypt`)
+3. stores the ciphertext as a JSON `password` field in a vault secret
+4. fetches the bundle by name (`POST .../secretbundles/actions/getByName`) and by OCID
+5. decrypts without a `keyVersionId` (the ciphertext envelope carries it)
+6. rotates the secret and checks `CURRENT` vs `PREVIOUS` stages
+7. creates a new key version and confirms the previous ciphertext still decrypts
+
+Prerequisites: Docker, `curl`, and `jq`.
+
+```bash
+docker compose -f scripts/tests/floci-oci-compose.yml up -d
+bash scripts/tests/floci-oci-roundtrip.sh
+```
+
+Health: `curl http://localhost:4599/_floci-oci/health`
+
+### Swarm smoke
+
+`scripts/tests/smoke-test-oci.sh`:
+
+1. starts `floci/floci-oci` unless health already succeeds
+2. creates a vault, AES key, and secret
 3. fetches the secret bundle by name over REST
 4. builds the plugin with `OCI_ENDPOINT=http://localhost:4599` and a throwaway API key
 5. deploys a Swarm stack and verifies the mounted secret, including after rotation
@@ -41,9 +66,6 @@ The `oci-floci-tests` workflow (`.github/workflows/oci-floci-tests.yml`) uses [f
 ```bash
 bash scripts/tests/smoke-test-oci.sh
 ```
-
-Health: `curl http://localhost:4599/_floci-oci/health`  
-Vault/KMS/Secrets API notes: https://floci.io/floci-oci/services/kms-vault/
 
 ## References
 
