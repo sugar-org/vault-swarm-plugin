@@ -42,8 +42,8 @@ func GetProviderInfo(providerType string) (map[string]string, error) {
 	case "vault", "hashicorp-vault":
 		info["name"] = "HashiCorp Vault"
 		info["description"] = "HashiCorp Vault secrets engine"
-		info["auth_methods"] = "token, approle"
-		info["env_vars"] = "VAULT_ADDR, VAULT_TOKEN, VAULT_MOUNT_PATH, VAULT_AUTH_METHOD, VAULT_ROLE_ID, VAULT_SECRET_ID"
+		info["auth_methods"] = "token, approle, jwt"
+		info["env_vars"] = "VAULT_ADDR, VAULT_TOKEN, VAULT_MOUNT_PATH, VAULT_AUTH_METHOD, VAULT_ROLE_ID, VAULT_SECRET_ID, VAULT_APPROLE_AUTH_PATH, VAULT_JWT_ROLE, VAULT_JWT, VAULT_JWT_FILE, VAULT_JWT_AUTH_PATH"
 
 	case "aws", "aws-secrets-manager":
 		info["name"] = "AWS Secrets Manager"
@@ -66,8 +66,8 @@ func GetProviderInfo(providerType string) (map[string]string, error) {
 	case "openbao":
 		info["name"] = "OpenBao"
 		info["description"] = "OpenBao secrets engine (Vault-compatible)"
-		info["auth_methods"] = "token, approle"
-		info["env_vars"] = "OPENBAO_ADDR, OPENBAO_TOKEN, OPENBAO_MOUNT_PATH, OPENBAO_AUTH_METHOD, OPENBAO_ROLE_ID, OPENBAO_SECRET_ID"
+		info["auth_methods"] = "token, approle, jwt"
+		info["env_vars"] = "OPENBAO_ADDR, OPENBAO_TOKEN, OPENBAO_MOUNT_PATH, OPENBAO_AUTH_METHOD, OPENBAO_ROLE_ID, OPENBAO_SECRET_ID, OPENBAO_APPROLE_AUTH_PATH, OPENBAO_JWT_ROLE, OPENBAO_JWT, OPENBAO_JWT_FILE, OPENBAO_JWT_AUTH_PATH"
 
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)

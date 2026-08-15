@@ -54,6 +54,31 @@
       "settable": ["value"]
     },
     {
+      "name": "VAULT_APPROLE_AUTH_PATH",
+      "description": "Vault AppRole auth mount path",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_ROLE",
+      "description": "Vault JWT auth role",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT",
+      "description": "Vault JWT auth token",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_FILE",
+      "description": "Path to a Vault JWT auth token file",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_AUTH_PATH",
+      "description": "Vault JWT auth mount path",
+      "settable": ["value"]
+    },
+    {
       "name": "VAULT_MOUNT_PATH",
       "description": "Vault mount path",
       "settable": ["value"]
@@ -81,6 +106,31 @@
     {
       "name": "OPENBAO_SECRET_ID",
       "description": "OpenBao AppRole secret ID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_APPROLE_AUTH_PATH",
+      "description": "OpenBao AppRole auth mount path",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_ROLE",
+      "description": "OpenBao JWT auth role",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT",
+      "description": "OpenBao JWT auth token",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_FILE",
+      "description": "Path to an OpenBao JWT auth token file",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_AUTH_PATH",
+      "description": "OpenBao JWT auth mount path",
       "settable": ["value"]
     },
     {

@@ -6,119 +6,50 @@ import (
 	"path"
 
 	"github.com/docker/go-plugins-helpers/secrets"
-	"github.com/openbao/openbao/api/v2"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/sugar-org/swarm-external-secrets/internal/kvpath"
-	"github.com/sugar-org/swarm-external-secrets/internal/utils"
+	"github.com/sugar-org/swarm-external-secrets/internal/vaultcompat"
 )
 
-// OpenBaoProvider implements the SecretsProvider interface for OpenBao
-// OpenBao is Vault-compatible, so we can reuse most of the Vault logic
+// OpenBaoProvider implements the SecretsProvider interface for OpenBao.
 type OpenBaoProvider struct {
-	client *api.Client
-	config *OpenBaoConfig
+	backend *vaultcompat.Backend
+	config  vaultcompat.Config
 }
 
-// OpenBaoConfig holds the configuration for the OpenBao client
-type OpenBaoConfig struct {
-	Address    string
-	Token      string
-	MountPath  string
-	RoleID     string
-	SecretID   string
-	AuthMethod string
-	CACert     string
-	ClientCert string
-	ClientKey  string // #nosec G117
-	SkipVerify bool
-}
-
-// Initialize sets up the OpenBao provider with the given configuration
+// Initialize sets up the OpenBao provider with the given configuration.
 func (o *OpenBaoProvider) Initialize(config map[string]string) error {
-	o.config = &OpenBaoConfig{
-		Address:    utils.GetConfigOrDefault(config, "OPENBAO_ADDR", "http://localhost:8200"),
-		Token:      config["OPENBAO_TOKEN"],
-		MountPath:  utils.GetConfigOrDefault(config, "OPENBAO_MOUNT_PATH", "secret"),
-		RoleID:     config["OPENBAO_ROLE_ID"],
-		SecretID:   config["OPENBAO_SECRET_ID"],
-		AuthMethod: utils.GetConfigOrDefault(config, "OPENBAO_AUTH_METHOD", "token"),
-		CACert:     config["OPENBAO_CACERT"],
-		ClientCert: config["OPENBAO_CLIENT_CERT"],
-		ClientKey:  config["OPENBAO_CLIENT_KEY"],
-		SkipVerify: utils.GetConfigOrDefault(config, "OPENBAO_SKIP_VERIFY", "false") == "true",
-	}
+	cfg := vaultcompat.ParseOpenBaoConfig(config)
 
-	// Configure OpenBao client (using OpenBao API client since OpenBao is compatible)
-	openBaoConfig := api.DefaultConfig()
-	openBaoConfig.Address = o.config.Address
-
-	// Configure TLS if certificates are provided or verification is skipped
-	if o.config.CACert != "" || o.config.ClientCert != "" || o.config.SkipVerify {
-		tlsConfig := &api.TLSConfig{
-			CACert:     o.config.CACert,
-			ClientCert: o.config.ClientCert,
-			ClientKey:  o.config.ClientKey,
-			Insecure:   o.config.SkipVerify,
-		}
-		if err := openBaoConfig.ConfigureTLS(tlsConfig); err != nil {
-			return fmt.Errorf("failed to configure TLS: %v", err)
-		}
-	}
-
-	client, err := api.NewClient(openBaoConfig)
+	backend, err := vaultcompat.New(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to create OpenBao client: %v", err)
-	}
-
-	o.client = client
-
-	// Authenticate with OpenBao
-	if err := o.authenticate(); err != nil {
 		return fmt.Errorf("failed to authenticate with OpenBao: %v", err)
 	}
 
-	log.Infof("Successfully initialized OpenBao provider using %s method", o.config.AuthMethod)
+	o.backend = backend
+	o.config = cfg
 	return nil
 }
 
-// GetSecret retrieves a secret value from OpenBao
+// GetSecret retrieves a secret value from OpenBao.
 func (o *OpenBaoProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	log.Debugf("Reading secret from OpenBao path: %s", secretInfo.SecretPath)
-
-	// Read secret from OpenBao
-	secret, err := o.client.Logical().ReadWithContext(ctx, secretInfo.SecretPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read secret from OpenBao: %v", err)
-	}
-
-	if secret == nil {
-		return nil, fmt.Errorf("secret not found at path: %s", secretInfo.SecretPath)
-	}
-
-	// Extract the secret value (unwraps KV v2 nested data if present)
-	value, err := ExtractSecretValueFromKV(secret.Data, secretInfo.SecretField)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract secret value: %v", err)
-	}
-
-	log.Debug("Successfully retrieved secret from OpenBao")
-	return value, nil
+	return o.backend.GetSecret(ctx, secretInfo)
 }
 
-// SupportsRotation indicates that OpenBao supports secret rotation monitoring
+// SupportsRotation indicates that OpenBao supports secret rotation monitoring.
 func (o *OpenBaoProvider) SupportsRotation() bool {
 	return true
 }
 
-// GetSecretFieldLabel returns the label key used by OpenBao for the secret field
+// GetSecretFieldLabel returns the label key used by OpenBao for the secret field.
 func (o *OpenBaoProvider) GetSecretFieldLabel() string {
-	return "openbao_field"
+	return o.config.FieldLabel
 }
 
-// BuildSecretPath constructs the OpenBao secret path based on request labels and service information
+// BuildSecretPath constructs the OpenBao secret path based on request labels and service information.
 func (o *OpenBaoProvider) BuildSecretPath(req secrets.Request) string {
-	if customPath, exists := req.SecretLabels["openbao_path"]; exists && customPath != "" {
+	if customPath, exists := req.SecretLabels[o.config.PathLabel]; exists && customPath != "" {
 		return kvpath.BuildMountedKVv2SecretPath(o.config.MountPath, customPath, "")
 	}
 
@@ -130,49 +61,20 @@ func (o *OpenBaoProvider) BuildSecretPath(req secrets.Request) string {
 	return kvpath.BuildMountedKVv2SecretPath(o.config.MountPath, "", secretName)
 }
 
-// GetProviderName returns the name of this provider
+// GetProviderName returns the name of this provider.
 func (o *OpenBaoProvider) GetProviderName() string {
 	return "openbao"
 }
 
-// Close performs cleanup for the OpenBao provider
+// Close performs cleanup for the OpenBao provider.
 func (o *OpenBaoProvider) Close() error {
-	// OpenBao client doesn't require explicit cleanup
-	return nil
-}
+	if o.backend == nil {
+		return nil
+	}
 
-// authenticate handles various OpenBao authentication methods
-func (o *OpenBaoProvider) authenticate() error {
-	switch o.config.AuthMethod {
-	case "token":
-		if o.config.Token == "" {
-			return fmt.Errorf("OPENBAO_TOKEN is required for token authentication")
-		}
-		o.client.SetToken(o.config.Token)
-
-	case "approle":
-		if o.config.RoleID == "" || o.config.SecretID == "" {
-			return fmt.Errorf("OPENBAO_ROLE_ID and OPENBAO_SECRET_ID are required for approle authentication")
-		}
-
-		data := map[string]interface{}{
-			"role_id":   o.config.RoleID,
-			"secret_id": o.config.SecretID,
-		}
-
-		resp, err := o.client.Logical().Write("auth/approle/login", data)
-		if err != nil {
-			return fmt.Errorf("approle authentication failed: %v", err)
-		}
-
-		if resp.Auth == nil {
-			return fmt.Errorf("no auth info returned from approle login")
-		}
-
-		o.client.SetToken(resp.Auth.ClientToken)
-
-	default:
-		return fmt.Errorf("unsupported authentication method: %s", o.config.AuthMethod)
+	if err := o.backend.Close(); err != nil {
+		log.Printf("Error closing OpenBao provider: %v", err)
+		return err
 	}
 
 	return nil
