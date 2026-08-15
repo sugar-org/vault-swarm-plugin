@@ -1,4 +1,4 @@
-name: AWS Kumo Tests
+name: AWS Floci Tests
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
     branches: [main, alpha/provider-integration]
 
 jobs:
-  aws-kumo-tests:
+  aws-floci-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -20,15 +20,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Start Kumo
+      - name: Start Floci
         run: |
-          docker compose -f scripts/tests/kumo-compose.yml up -d --wait --wait-timeout 30 || {
-            echo "Kumo did not become healthy within 30s"
-            docker compose -f scripts/tests/kumo-compose.yml logs
+          docker compose -f scripts/tests/floci-compose.yml up -d --wait --wait-timeout 30 || {
+            echo "Floci did not become healthy within 30s"
+            docker compose -f scripts/tests/floci-compose.yml logs
             exit 1
           }
 
-      - name: Run Kumo tests
+      - name: Run Floci tests
         env:
           AWS_REGION: us-east-1
           AWS_ACCESS_KEY_ID: test
@@ -36,4 +36,4 @@ jobs:
           AWS_ENDPOINT_URL: http://localhost:4566
           AWS_KMS_ENDPOINT: http://localhost:4566
         run: |
-          go test ./providers/... ./internal/secrettransform/... -run Kumo -count=1 -v
+          go test ./providers/... ./internal/secrettransform/... -run Floci -count=1 -v
