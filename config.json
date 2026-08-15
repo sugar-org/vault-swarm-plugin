@@ -234,6 +234,16 @@
       "settable": ["value"]
     },
     {
+      "name": "SECRET_MANAGER_EMULATOR_HOST",
+      "description": "GCP Secret Manager emulator host:port (floci-gcp, e.g. localhost:4588)",
+      "settable": ["value"]
+    },
+    {
+      "name": "GCP_ENDPOINT",
+      "description": "Optional GCP Secret Manager endpoint override (alias for SECRET_MANAGER_EMULATOR_HOST)",
+      "settable": ["value"]
+    },
+    {
       "name": "ENABLE_MONITORING",
       "description": "Enable Monitoring secret rotation (true/false) default true",
       "settable": ["value"]
