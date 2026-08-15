@@ -36,14 +36,16 @@ wait_for_state() {
 
 b64() {
     if [[ $# -gt 0 ]]; then
-        printf '%s' "$1" | base64 -w0 2>/dev/null || printf '%s' "$1" | base64 | tr -d '\n'
+        local value="$1"
+        printf '%s' "${value}" | base64 -w0 2>/dev/null || printf '%s' "${value}" | base64 | tr -d '\n'
     else
         base64 -w0 2>/dev/null || base64 | tr -d '\n'
     fi
 }
 
 encrypt() {
-    jq -nc --arg keyId "${KEY_OCID}" --arg plaintext "$(b64 "$1")" \
+    local plaintext="$1"
+    jq -nc --arg keyId "${KEY_OCID}" --arg plaintext "$(b64 "${plaintext}")" \
         '{keyId:$keyId,plaintext:$plaintext,encryptionAlgorithm:"AES_256_GCM"}' \
         | oci_api -X POST "${OCI_ENDPOINT}/20180608/encrypt" -d @- \
         | jq -r '.ciphertext'
@@ -60,7 +62,8 @@ decrypt() {
 }
 
 json_secret() {
-    jq -nc --arg password "$1" '{password:$password}' | b64
+    local password="$1"
+    jq -nc --arg password "${password}" '{password:$password}' | b64
 }
 
 fetch_bundle_by_name() {
