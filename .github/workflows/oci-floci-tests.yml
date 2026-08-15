@@ -1,0 +1,36 @@
+name: OCI Floci Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, alpha/provider-integration, feat/oci-provider]
+
+jobs:
+  oci-floci-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OCI_ENDPOINT: http://localhost:4599
+      OCI_REGION: us-ashburn-1
+      OCI_TENANCY_OCID: ocid1.tenancy.oc1..flocilocaltenancy0000000000000000000000000000000000000000
+      OCI_AUTH_METHOD: api_key
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Init Docker Swarm
+        run: docker swarm init
+
+      # floci-oci is started by the smoke test itself. The test uses curl
+      # against the Vault/KMS/Secrets REST APIs; the OCI CLI is not required.
+      - name: Run OCI Vault smoke test
+        run: bash scripts/tests/smoke-test-oci.sh
+
+      - name: floci-oci logs
+        if: failure()
+        run: docker logs smoke-floci-oci || true
