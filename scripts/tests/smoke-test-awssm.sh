@@ -51,7 +51,7 @@ trap cleanup EXIT
 command -v aws >/dev/null 2>&1 || die "aws CLI is required to run the AWS Secrets Manager smoke test."
 
 # Start floci container (skip if an emulator is already serving on 4566, e.g. in CI)
-if curl -s "${AWS_ENDPOINT}/_localstack/health" >/dev/null 2>&1; then
+if aws_cmd secretsmanager list-secrets >/dev/null 2>&1; then
     info "AWS emulator already running on 4566, skipping container start."
     FLOCI_CONTAINER=""
 else
@@ -62,11 +62,11 @@ else
         "${FLOCI_IMAGE}"
 fi
 
-# Wait for floci to be ready. Floci serves the LocalStack-compatible health
-# endpoint, so we probe it directly until it reports services available.
+# Wait for floci to be ready. Floci's /_localstack/health response shape differs
+# from LocalStack's, so we probe the Secrets Manager API directly until it answers.
 info "Waiting for floci to be ready..."
 elapsed=0
-until curl -s "${AWS_ENDPOINT}/_localstack/health" | grep -q "available" 2>/dev/null; do
+until aws_cmd secretsmanager list-secrets >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
     [[ "${elapsed}" -lt 60 ]] || die "floci did not become ready within 60s."
