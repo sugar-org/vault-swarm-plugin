@@ -49,7 +49,7 @@ prepare_plugin_log_path() {
     mkdir -p "${LOG_EXPORT_DIR}"
     : > "${PLUGIN_LOG_EXPORT}"
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+    if [[ "$(uname -s)" = "Darwin" ]]; then
         info "Preparing plugin log path inside Docker Desktop VM..."
         docker run --rm --privileged --pid=host justincormack/nsenter1 \
             sh -lc "mkdir -p /run/swarm-external-secrets && touch '${PLUGIN_LOG_PATH}' && chmod -R 777 /run/swarm-external-secrets"
@@ -57,24 +57,22 @@ prepare_plugin_log_path() {
     fi
 
     info "Preparing plugin log path on Linux host..."
-    if [ "$(id -u)" -eq 0 ]; then
+    if [[ "$(id -u)" -eq 0 ]]; then
         mkdir -p /run/swarm-external-secrets
         touch "${PLUGIN_LOG_PATH}"
-        chmod -R 777 /run/swarm-external-secrets
     else
         sudo mkdir -p /run/swarm-external-secrets
         sudo touch "${PLUGIN_LOG_PATH}"
-        sudo chmod -R 777 /run/swarm-external-secrets
     fi
 }
 
 export_plugin_logs() {
     mkdir -p "${LOG_EXPORT_DIR}"
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+    if [[ "$(uname -s)" = "Darwin" ]]; then
         docker run --rm --privileged --pid=host justincormack/nsenter1 \
             sh -lc "cat '${PLUGIN_LOG_PATH}' 2>/dev/null" > "${PLUGIN_LOG_EXPORT}" || true
-    elif [ -r "${PLUGIN_LOG_PATH}" ]; then
+    elif [[ -r "${PLUGIN_LOG_PATH}" ]]; then
         cp "${PLUGIN_LOG_PATH}" "${PLUGIN_LOG_EXPORT}" || true
     elif command -v sudo >/dev/null 2>&1; then
         sudo cp "${PLUGIN_LOG_PATH}" "${PLUGIN_LOG_EXPORT}" 2>/dev/null || true
