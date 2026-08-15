@@ -73,7 +73,8 @@ trap cleanup EXIT
 
 # doppler_signature BODY — HMAC-SHA256 of BODY keyed by WEBHOOK_SECRET.
 doppler_signature() {
-    printf '%s' "$1" \
+    local body="$1"
+    printf '%s' "${body}" \
         | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" -hex \
         | sed 's/^.*= //'
 }

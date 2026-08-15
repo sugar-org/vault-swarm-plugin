@@ -85,19 +85,7 @@ func TestServer_HandleTriggersEvent(t *testing.T) {
 		close(done)
 	}
 
-	s := New(":0", "/webhooks/doppler", secret, onEvent)
-	srv := httptest.NewServer(s.server.Handler)
-	defer srv.Close()
-
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+"/webhooks/doppler", strings.NewReader(body))
-	req.Header.Set(signatureHeader, sign(secret, body))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	_ = resp.Body.Close()
-
+	resp := postWebhook(t, secret, onEvent, http.MethodPost, body, sign(secret, body))
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
@@ -122,19 +110,7 @@ func TestServer_HandleRejectsBadSignature(t *testing.T) {
 	called := false
 	onEvent := func(_ Payload) { called = true }
 
-	s := New(":0", "/webhooks/doppler", secret, onEvent)
-	srv := httptest.NewServer(s.server.Handler)
-	defer srv.Close()
-
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+"/webhooks/doppler", strings.NewReader(body))
-	req.Header.Set(signatureHeader, sign("wrong-secret", body))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	_ = resp.Body.Close()
-
+	resp := postWebhook(t, secret, onEvent, http.MethodPost, body, sign("wrong-secret", body))
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
 	}
@@ -224,23 +200,14 @@ func TestServer_HandleStatusAndDispatch(t *testing.T) {
 			done := make(chan struct{}, 1)
 			onEvent := func(_ Payload) { done <- struct{}{} }
 
-			s := New(":0", "/webhooks/doppler", secret, onEvent)
-			srv := httptest.NewServer(s.server.Handler)
-			defer srv.Close()
-
-			req, _ := http.NewRequestWithContext(t.Context(), tt.method, srv.URL+"/webhooks/doppler", strings.NewReader(tt.body))
+			sig := ""
 			switch {
 			case tt.sign:
-				req.Header.Set(signatureHeader, sign(secret, tt.body))
+				sig = sign(secret, tt.body)
 			case tt.signature != "":
-				req.Header.Set(signatureHeader, tt.signature)
+				sig = tt.signature
 			}
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("request failed: %v", err)
-			}
-			_ = resp.Body.Close()
+			resp := postWebhook(t, secret, onEvent, tt.method, tt.body, sig)
 
 			if resp.StatusCode != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", resp.StatusCode, tt.wantStatus)
@@ -277,21 +244,9 @@ func TestServer_HandleOversizedBodyTruncated(t *testing.T) {
 	called := false
 	onEvent := func(_ Payload) { called = true }
 
-	s := New(":0", "/webhooks/doppler", secret, onEvent)
-	srv := httptest.NewServer(s.server.Handler)
-	defer srv.Close()
-
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+"/webhooks/doppler", strings.NewReader(body))
 	// Signature is computed over the full body; the server only reads the first
 	// maxBodyBytes, so verification must fail.
-	req.Header.Set(signatureHeader, sign(secret, body))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	_ = resp.Body.Close()
-
+	resp := postWebhook(t, secret, onEvent, http.MethodPost, body, sign(secret, body))
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
 	}
@@ -300,4 +255,26 @@ func TestServer_HandleOversizedBodyTruncated(t *testing.T) {
 	if called {
 		t.Fatal("onEvent should not be called when the body is truncated")
 	}
+}
+
+func postWebhook(t *testing.T, secret string, onEvent func(Payload), method, body, signature string) *http.Response {
+	t.Helper()
+	s := New(":0", "/webhooks/doppler", secret, onEvent)
+	srv := httptest.NewServer(s.server.Handler)
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequestWithContext(t.Context(), method, srv.URL+"/webhooks/doppler", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	if signature != "" {
+		req.Header.Set(signatureHeader, signature)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	return resp
 }

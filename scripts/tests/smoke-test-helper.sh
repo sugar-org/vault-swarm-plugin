@@ -165,6 +165,7 @@ networks:
   smoke-network:
     driver: overlay
 EOF
+    return 0
 }
 
 # ---- Doppler backend helpers (real Doppler vs local mock) ----
@@ -180,7 +181,10 @@ EOF
 #   DOPPLER_PLUGIN_TOKEN   - token the plugin should use
 #   DOPPLER_PLUGIN_API_URL - API base the plugin should use
 
-doppler_is_real() { [[ -n "${DOPPLER_SMOKE_TOKEN:-}" ]]; }
+doppler_is_real() {
+    [[ -n "${DOPPLER_SMOKE_TOKEN:-}" ]] && return 0
+    return 1
+}
 
 doppler_init_backend() {
     if doppler_is_real; then
@@ -193,6 +197,7 @@ doppler_init_backend() {
         DOPPLER_PLUGIN_API_URL="${DOPPLER_MOCK_URL}"
     fi
     export DOPPLER_MODE DOPPLER_PLUGIN_TOKEN DOPPLER_PLUGIN_API_URL
+    return 0
 }
 
 # Build the project/config query string shared by real-mode API calls.
@@ -201,6 +206,7 @@ doppler_query() {
     if [[ -n "${DOPPLER_PROJECT:-}" ]]; then qs+="${sep}project=${DOPPLER_PROJECT}"; sep="&"; fi
     if [[ -n "${DOPPLER_CONFIG:-}" ]]; then qs+="${sep}config=${DOPPLER_CONFIG}"; sep="&"; fi
     printf '%s' "${qs}"
+    return 0
 }
 
 # doppler_seed_secret NAME VALUE — create/update a secret in the active backend.
@@ -216,6 +222,7 @@ doppler_seed_secret() {
             -H "Content-Type: application/json" \
             -d "{\"name\":\"${name}\",\"value\":\"${value}\"}" >/dev/null
     fi
+    return 0
 }
 
 # doppler_delete_secret NAME — best-effort cleanup of a real Doppler secret.
@@ -240,6 +247,7 @@ doppler_wait_readable() {
         elapsed=$((elapsed + 2))
         [[ "${elapsed}" -lt "${timeout}" ]] || die "Seeded secret did not become readable within ${timeout}s."
     done
+    return 0
 }
 
 # Deploy swarm stack (mirrors deploy.sh pattern)

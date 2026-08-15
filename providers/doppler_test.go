@@ -69,24 +69,10 @@ func TestDopplerProviderInitialize(t *testing.T) {
 }
 
 func TestDopplerProviderGetSecret(t *testing.T) {
-	server := newDopplerTestServer(map[string]string{
+	provider, _ := setupDopplerProvider(t, map[string]string{
 		"MYSQL_PASSWORD": "secret-value",
 		"API_KEY":        "key-value",
-	})
-	defer server.Close()
-
-	provider := &DopplerProvider{}
-	if err := provider.Initialize(map[string]string{
-		"DOPPLER_TOKEN":     "dp.pt.test",
-		"DOPPLER_PROJECT":   "my-api",
-		"DOPPLER_CONFIG":    "dev",
-		"DOPPLER_API_URL":   server.URL,
-		"DOPPLER_CACHE_TTL": "1m",
-	}); err != nil {
-		t.Fatalf("initialize failed: %v", err)
-	}
-
-	ctx := context.Background()
+	}, "1m")
 
 	t.Run("explicit label", func(t *testing.T) {
 		req := secrets.Request{
@@ -95,35 +81,25 @@ func TestDopplerProviderGetSecret(t *testing.T) {
 				"doppler_secret_name": "MYSQL_PASSWORD",
 			},
 		}
-		secretInfo := &SecretInfo{
+		got := mustGetSecret(t, provider, &SecretInfo{
 			DockerSecretName: req.SecretName,
 			SecretPath:       provider.BuildSecretPath(req),
 			SecretField:      "MYSQL_PASSWORD",
 			Labels:           req.SecretLabels,
-		}
-
-		value, err := provider.GetSecret(ctx, secretInfo)
-		if err != nil {
-			t.Fatalf("GetSecret failed: %v", err)
-		}
-		if string(value) != "secret-value" {
-			t.Fatalf("expected secret-value, got %q", string(value))
+		})
+		if got != "secret-value" {
+			t.Fatalf("expected secret-value, got %q", got)
 		}
 	})
 
 	t.Run("uppercase fallback", func(t *testing.T) {
-		secretInfo := &SecretInfo{
+		got := mustGetSecret(t, provider, &SecretInfo{
 			DockerSecretName: "api_key",
 			SecretPath:       provider.BuildSecretPath(secrets.Request{SecretName: "api_key"}),
 			SecretField:      "value",
-		}
-
-		value, err := provider.GetSecret(ctx, secretInfo)
-		if err != nil {
-			t.Fatalf("GetSecret failed: %v", err)
-		}
-		if string(value) != "key-value" {
-			t.Fatalf("expected key-value, got %q", string(value))
+		})
+		if got != "key-value" {
+			t.Fatalf("expected key-value, got %q", got)
 		}
 	})
 }
@@ -131,110 +107,51 @@ func TestDopplerProviderGetSecret(t *testing.T) {
 func TestDopplerProviderCaching(t *testing.T) {
 	t.Parallel()
 
-	state := &dopplerTestState{
-		secrets: map[string]string{
-			"CACHE_TEST": "v1",
-		},
-	}
-	server := httptest.NewServer(http.HandlerFunc(state.handler))
-	defer server.Close()
-
-	provider := &DopplerProvider{}
-	if err := provider.Initialize(map[string]string{
-		"DOPPLER_TOKEN":     "dp.pt.test",
-		"DOPPLER_PROJECT":   "my-api",
-		"DOPPLER_CONFIG":    "dev",
-		"DOPPLER_API_URL":   server.URL,
-		"DOPPLER_CACHE_TTL": "1m",
-	}); err != nil {
-		t.Fatalf("initialize failed: %v", err)
-	}
-
-	ctx := context.Background()
-	secretInfo := &SecretInfo{
+	provider, state := setupDopplerProvider(t, map[string]string{"CACHE_TEST": "v1"}, "1m")
+	info := &SecretInfo{
 		DockerSecretName: "cache_test",
 		SecretPath:       "my-api/dev/CACHE_TEST",
 		SecretField:      "CACHE_TEST",
 	}
 
-	if _, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("first GetSecret failed: %v", err)
+	if got := mustGetSecret(t, provider, info); got != "v1" {
+		t.Fatalf("expected v1, got %q", got)
 	}
-	if state.requestCount.Load() != 1 {
-		t.Fatalf("expected 1 API call, got %d", state.requestCount.Load())
-	}
+	assertRequestCount(t, state, 1)
 
 	state.secrets["CACHE_TEST"] = "v2"
-
-	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("cached GetSecret failed: %v", err)
-	} else if string(value) != "v1" {
-		t.Fatalf("expected cached value v1, got %q", string(value))
+	if got := mustGetSecret(t, provider, info); got != "v1" {
+		t.Fatalf("expected cached value v1, got %q", got)
 	}
-	if state.requestCount.Load() != 1 {
-		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount.Load())
-	}
+	assertRequestCount(t, state, 1)
 }
 
 func TestDopplerProviderRefreshAfterCacheTTL(t *testing.T) {
 	t.Parallel()
 
-	state := &dopplerTestState{
-		secrets: map[string]string{
-			"ROTATE_ME": "v1",
-		},
-	}
-	server := httptest.NewServer(http.HandlerFunc(state.handler))
-	defer server.Close()
-
-	provider := &DopplerProvider{}
-	if err := provider.Initialize(map[string]string{
-		"DOPPLER_TOKEN":     "dp.pt.test",
-		"DOPPLER_PROJECT":   "my-api",
-		"DOPPLER_CONFIG":    "dev",
-		"DOPPLER_API_URL":   server.URL,
-		"DOPPLER_CACHE_TTL": "50ms",
-	}); err != nil {
-		t.Fatalf("initialize failed: %v", err)
-	}
-
-	ctx := context.Background()
-	secretInfo := &SecretInfo{
+	provider, state := setupDopplerProvider(t, map[string]string{"ROTATE_ME": "v1"}, "50ms")
+	info := &SecretInfo{
 		SecretPath:  "my-api/dev/ROTATE_ME",
 		SecretField: "ROTATE_ME",
 	}
 
-	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("GetSecret failed: %v", err)
-	} else if string(value) != "v1" {
-		t.Fatalf("expected v1, got %q", string(value))
+	if got := mustGetSecret(t, provider, info); got != "v1" {
+		t.Fatalf("expected v1, got %q", got)
 	}
-	if state.requestCount.Load() != 1 {
-		t.Fatalf("expected 1 API call, got %d", state.requestCount.Load())
-	}
+	assertRequestCount(t, state, 1)
 
 	state.secrets["ROTATE_ME"] = "v2"
-
-	// Within TTL, rotation checks should still see the cached value.
-	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("cached GetSecret failed: %v", err)
-	} else if string(value) != "v1" {
-		t.Fatalf("expected cached value v1, got %q", string(value))
+	if got := mustGetSecret(t, provider, info); got != "v1" {
+		t.Fatalf("expected cached value v1, got %q", got)
 	}
-	if state.requestCount.Load() != 1 {
-		t.Fatalf("expected cache hit with 1 API call, got %d", state.requestCount.Load())
-	}
+	assertRequestCount(t, state, 1)
 
 	time.Sleep(75 * time.Millisecond)
 
-	if value, err := provider.GetSecret(ctx, secretInfo); err != nil {
-		t.Fatalf("post-TTL GetSecret failed: %v", err)
-	} else if string(value) != "v2" {
-		t.Fatalf("expected refreshed value v2, got %q", string(value))
+	if got := mustGetSecret(t, provider, info); got != "v2" {
+		t.Fatalf("expected refreshed value v2, got %q", got)
 	}
-	if state.requestCount.Load() != 2 {
-		t.Fatalf("expected refresh after TTL with 2 API calls, got %d", state.requestCount.Load())
-	}
+	assertRequestCount(t, state, 2)
 }
 
 func TestDopplerProviderBuildSecretPath(t *testing.T) {
@@ -281,7 +198,37 @@ func (s *dopplerTestState) handler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(s.secrets)
 }
 
-func newDopplerTestServer(secretsMap map[string]string) *httptest.Server {
+func setupDopplerProvider(t *testing.T, secretsMap map[string]string, cacheTTL string) (*DopplerProvider, *dopplerTestState) {
+	t.Helper()
 	state := &dopplerTestState{secrets: secretsMap}
-	return httptest.NewServer(http.HandlerFunc(state.handler))
+	server := httptest.NewServer(http.HandlerFunc(state.handler))
+	t.Cleanup(server.Close)
+
+	provider := &DopplerProvider{}
+	if err := provider.Initialize(map[string]string{
+		"DOPPLER_TOKEN":     "dp.pt.test",
+		"DOPPLER_PROJECT":   "my-api",
+		"DOPPLER_CONFIG":    "dev",
+		"DOPPLER_API_URL":   server.URL,
+		"DOPPLER_CACHE_TTL": cacheTTL,
+	}); err != nil {
+		t.Fatalf("initialize failed: %v", err)
+	}
+	return provider, state
+}
+
+func mustGetSecret(t *testing.T, provider *DopplerProvider, info *SecretInfo) string {
+	t.Helper()
+	value, err := provider.GetSecret(context.Background(), info)
+	if err != nil {
+		t.Fatalf("GetSecret failed: %v", err)
+	}
+	return string(value)
+}
+
+func assertRequestCount(t *testing.T, state *dopplerTestState, want int32) {
+	t.Helper()
+	if got := state.requestCount.Load(); got != want {
+		t.Fatalf("expected %d API calls, got %d", want, got)
+	}
 }
