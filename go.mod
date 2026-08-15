@@ -19,6 +19,7 @@ require (
 	github.com/oracle/oci-go-sdk/v65 v65.123.0
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/api v0.237.0
+	google.golang.org/grpc v1.73.0
 )
 
 require (
@@ -101,7 +102,6 @@ require (
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
-	google.golang.org/grpc v1.73.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )

@@ -2,7 +2,7 @@
   "description": "External secrets plugin for Docker Swarm",
   "documentation": "https://docs.docker.com/engine/extend/",
   "interface": {
-    "types": ["docker.secretdriver/1.0","docker.secretprovider/1.0"],
+    "types": ["docker.secretdriver/1.0", "docker.secretprovider/1.0"],
     "socket": "plugin.sock"
   },
   "entrypoint": ["./swarm-external-secrets"],
@@ -204,23 +204,43 @@
       "settable": ["value"]
     },
     {
-      "name" : "AZURE_ACCESS_TOKEN",
+      "name": "AZURE_ACCESS_TOKEN",
       "description": "Azure access token for Key Vault",
       "settable": ["value"]
     },
     {
-      "name" : "GCP_PROJECT_ID",
+      "name": "AZURE_INSECURE_HTTP",
+      "description": "Allow HTTP connections to Azure Key Vault (for local emulators like floci-az)",
+      "settable": ["value"]
+    },
+    {
+      "name": "AZURE_AUTHORITY_HOST",
+      "description": "Azure authority host URL (for local emulators like floci-az)",
+      "settable": ["value"]
+    },
+    {
+      "name": "GCP_PROJECT_ID",
       "description": "GCP project ID",
       "settable": ["value"]
     },
     {
-      "name" : "GOOGLE_APPLICATION_CREDENTIALS",
+      "name": "GOOGLE_APPLICATION_CREDENTIALS",
       "description": "Google application credentials required for GCP Secrets manager",
       "settable": ["value"]
     },
     {
-      "name" : "GCP_CREDENTIALS_JSON",
+      "name": "GCP_CREDENTIALS_JSON",
       "description": "Google credentials json required for GCP Secrets manager",
+      "settable": ["value"]
+    },
+    {
+      "name": "SECRET_MANAGER_EMULATOR_HOST",
+      "description": "GCP Secret Manager emulator host:port (floci-gcp, e.g. localhost:4588)",
+      "settable": ["value"]
+    },
+    {
+      "name": "GCP_ENDPOINT",
+      "description": "Optional GCP Secret Manager endpoint override (alias for SECRET_MANAGER_EMULATOR_HOST)",
       "settable": ["value"]
     },
     {

@@ -58,7 +58,7 @@ func GetProviderInfo(providerType string) (map[string]string, error) {
 		info["name"] = "GCP Secret Manager"
 		info["description"] = "Google Cloud Platform Secret Manager"
 		info["auth_methods"] = "service account, ADC"
-		info["env_vars"] = "GCP_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS, GCP_CREDENTIALS_JSON"
+		info["env_vars"] = "GCP_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS, GCP_CREDENTIALS_JSON, SECRET_MANAGER_EMULATOR_HOST, GCP_ENDPOINT"
 
 	case "azure", "azure-key-vault":
 		info["name"] = "Azure Key Vault"
