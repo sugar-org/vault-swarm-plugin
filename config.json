@@ -85,7 +85,7 @@
     },
     {
       "name": "SECRETS_PROVIDER",
-      "description": "Secrets provider type (e.g., vault, openbao)",
+      "description": "Secrets provider type (e.g., vault, aws, azure, openbao, oci)",
       "settable": ["value"]
     },
     {
@@ -241,6 +241,51 @@
     {
       "name": "GCP_ENDPOINT",
       "description": "Optional GCP Secret Manager endpoint override (alias for SECRET_MANAGER_EMULATOR_HOST)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_REGION",
+      "description": "OCI region",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_TENANCY_OCID",
+      "description": "OCI tenancy OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_USER_OCID",
+      "description": "OCI user OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_FINGERPRINT",
+      "description": "OCI API key fingerprint",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_PRIVATE_KEY",
+      "description": "OCI private key (base64-encoded PEM)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_PRIVATE_KEY_PASSPHRASE",
+      "description": "OCI private key passphrase",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_VAULT_OCID",
+      "description": "OCI Vault OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_AUTH_METHOD",
+      "description": "OCI authentication method (api_key, instance_principal)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_ENDPOINT",
+      "description": "OCI API endpoint override (e.g. floci-oci http://localhost:4599)",
       "settable": ["value"]
     },
     {
