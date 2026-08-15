@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os" // Imported to read environment variables
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore" // Imported for credentials
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -49,27 +50,37 @@ func (az *AzureProvider) Initialize(config map[string]string) error {
 	var cred azcore.TokenCredential
 	var err error
 
-	// Prioritize Service Principal credentials from environment variables.
-	tenantID := os.Getenv("AZURE_TENANT_ID")
-	clientID := os.Getenv("AZURE_CLIENT_ID")
-	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
+	accessToken := firstNonEmpty(config["AZURE_ACCESS_TOKEN"], os.Getenv("AZURE_ACCESS_TOKEN"))
+	tenantID := firstNonEmpty(config["AZURE_TENANT_ID"], os.Getenv("AZURE_TENANT_ID"))
+	clientID := firstNonEmpty(config["AZURE_CLIENT_ID"], os.Getenv("AZURE_CLIENT_ID"))
+	clientSecret := firstNonEmpty(config["AZURE_CLIENT_SECRET"], os.Getenv("AZURE_CLIENT_SECRET"))
+	authorityHost := firstNonEmpty(config["AZURE_AUTHORITY_HOST"], os.Getenv("AZURE_AUTHORITY_HOST"))
 
-	if tenantID != "" && clientID != "" && clientSecret != "" {
+	switch {
+	case accessToken != "":
+		// Static tokens skip Entra. Required for HTTP emulators: Azure Identity
+		// rejects non-HTTPS authority hosts ("cannot use an authority host without https").
+		log.Info("Authenticating with Azure using a static access token.")
+		cred = staticTokenCredential{token: accessToken}
+	case tenantID != "" && clientID != "" && clientSecret != "":
 		log.Info("Authenticating with Azure using Service Principal credentials.")
 		credOpts := &azidentity.ClientSecretCredentialOptions{
 			DisableInstanceDiscovery: insecureHTTP,
 		}
 		if insecureHTTP {
-			credOpts.Cloud.ActiveDirectoryAuthorityHost = os.Getenv("AZURE_AUTHORITY_HOST")
-			if credOpts.Cloud.ActiveDirectoryAuthorityHost == "" {
-				credOpts.Cloud.ActiveDirectoryAuthorityHost = "http://localhost:4577"
+			if authorityHost == "" {
+				authorityHost = "https://localhost:4577"
 			}
+			if !strings.HasPrefix(strings.ToLower(authorityHost), "https://") {
+				return fmt.Errorf("AZURE_AUTHORITY_HOST %q must use https (Azure Identity SDK requirement); for HTTP emulators like floci-az set AZURE_ACCESS_TOKEN instead", authorityHost)
+			}
+			credOpts.Cloud.ActiveDirectoryAuthorityHost = authorityHost
 		}
 		cred, err = azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, credOpts)
 		if err != nil {
 			return fmt.Errorf("failed to create Azure credential using Service Principal: %w", err)
 		}
-	} else {
+	default:
 		// Fallback to default credential chain (Managed Identity, Azure CLI, etc.)
 		log.Info("Service Principal credentials not found. Falling back to Default Azure Credential.")
 		cred, err = azidentity.NewDefaultAzureCredential(nil)
@@ -177,11 +188,37 @@ func (az *AzureProvider) Close() error {
 type forceHTTPTransport struct{}
 
 func (t *forceHTTPTransport) Do(req *http.Request) (*http.Response, error) {
-	if req.URL.Scheme == "https" {
-		req.URL.Scheme = "http"
+	if req.URL != nil && req.URL.Scheme == "https" {
+		clone := req.Clone(req.Context())
+		clone.URL.Scheme = "http"
+		return http.DefaultTransport.RoundTrip(clone)
 	}
 	return http.DefaultTransport.RoundTrip(req)
 }
 
 // Ensure forceHTTPTransport satisfies policy.Transporter.
 var _ policy.Transporter = (*forceHTTPTransport)(nil)
+
+// staticTokenCredential returns a fixed bearer token. Used for local emulators
+// that accept any Authorization header (floci-az Key Vault REST).
+type staticTokenCredential struct {
+	token string
+}
+
+func (s staticTokenCredential) GetToken(_ context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	return azcore.AccessToken{
+		Token:     s.token,
+		ExpiresOn: time.Now().Add(time.Hour),
+	}, nil
+}
+
+var _ azcore.TokenCredential = staticTokenCredential{}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}

@@ -37,4 +37,4 @@ jobs:
 
       - name: floci-az logs
         if: failure()
-        run: docker logs smoke-floci-az
+        run: docker logs smoke-floci-az || true

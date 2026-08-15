@@ -42,6 +42,8 @@ cleanup() {
     remove_stack "${STACK_NAME}"
     docker secret rm "${SECRET_NAME}" 2>/dev/null || true
     if [[ -n "${FLOCI_CONTAINER}" ]]; then
+        echo -e "${RED}floci-az logs:${DEF}"
+        docker logs "${FLOCI_CONTAINER}" 2>/dev/null || true
         docker stop "${FLOCI_CONTAINER}" 2>/dev/null || true
         docker rm   "${FLOCI_CONTAINER}" 2>/dev/null || true
     fi
@@ -88,13 +90,12 @@ success "Secret written: ${SECRET_PATH}"
 info "Building plugin and setting Azure Key Vault config..."
 build_plugin
 docker plugin disable "${PLUGIN_NAME}" --force 2>/dev/null || true
+# Azure Identity rejects HTTP authority hosts, so the emulator path uses the
+# same static bearer token as the curl helpers above instead of client-secret auth.
 docker plugin set "${PLUGIN_NAME}" \
     SECRETS_PROVIDER="azure" \
     AZURE_VAULT_URL="${AZURE_VAULT_URL}" \
-    AZURE_TENANT_ID="${AZURE_TENANT_ID}" \
-    AZURE_CLIENT_ID="${AZURE_CLIENT_ID}" \
-    AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET}" \
-    AZURE_AUTHORITY_HOST="${AZURE_AUTHORITY_HOST}" \
+    AZURE_ACCESS_TOKEN="fake-token" \
     AZURE_INSECURE_HTTP="true" \
     ENABLE_ROTATION="true" \
     ROTATION_INTERVAL="10s" \
