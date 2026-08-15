@@ -107,10 +107,10 @@ func (o *OCIProvider) buildConfigProvider() (common.ConfigurationProvider, error
 
 // GetSecret retrieves a secret value from OCI Vault
 func (o *OCIProvider) GetSecret(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	if secretID := secretInfo.Labels["oci_secret_ocid"]; secretID != "" {
-		log.Infof("Reading secret from OCI Vault by OCID: %s (stage: %s)", secretID, secretInfo.Labels["oci_stage"])
+	if secretID := secretLabel(secretInfo.Labels, "oci_secret_ocid"); secretID != "" {
+		log.Infof("Reading secret from OCI Vault by OCID: %s (stage: %s)", secretID, secretLabel(secretInfo.Labels, "oci_stage"))
 	} else {
-		log.Infof("Reading secret from OCI Vault: %s (stage: %s)", secretInfo.SecretPath, secretInfo.Labels["oci_stage"])
+		log.Infof("Reading secret from OCI Vault: %s (stage: %s)", secretInfo.SecretPath, secretLabel(secretInfo.Labels, "oci_stage"))
 	}
 
 	rawValue, err := o.fetchRawContent(ctx, secretInfo)
@@ -128,13 +128,13 @@ func (o *OCIProvider) SupportsRotation() bool {
 
 // fetchRawContent retrieves the raw decoded secret bytes using either OCID or name-based lookup.
 func (o *OCIProvider) fetchRawContent(ctx context.Context, secretInfo *SecretInfo) ([]byte, error) {
-	stage, err := resolveStage(secretInfo.Labels["oci_stage"])
+	stage, err := resolveStage(secretLabel(secretInfo.Labels, "oci_stage"))
 	if err != nil {
 		return nil, err
 	}
 
 	var content ocisecrets.SecretBundleContentDetails
-	if secretID, exists := secretInfo.Labels["oci_secret_ocid"]; exists && secretID != "" {
+	if secretID := secretLabel(secretInfo.Labels, "oci_secret_ocid"); secretID != "" {
 		content, err = o.fetchBundleByID(ctx, secretID, stage)
 	} else {
 		content, err = o.fetchBundleByName(ctx, secretInfo.SecretPath, secretInfo.Labels, stage)
@@ -165,9 +165,9 @@ func (o *OCIProvider) fetchBundleByID(ctx context.Context, secretID string, stag
 }
 
 func (o *OCIProvider) fetchBundleByName(ctx context.Context, secretName string, labels map[string]string, stage SecretStager) (ocisecrets.SecretBundleContentDetails, error) {
-	vaultOCID := labels["oci_vault_ocid"]
+	vaultOCID := secretLabel(labels, "oci_vault_ocid")
 	if vaultOCID == "" {
-		vaultOCID = o.config.VaultOCID
+		vaultOCID = strings.TrimSpace(o.config.VaultOCID)
 	}
 	if vaultOCID == "" {
 		return nil, fmt.Errorf("OCI_VAULT_OCID or oci_vault_ocid label is required when checking secrets by name")
@@ -199,7 +199,7 @@ func (o *OCIProvider) GetSecretFieldLabel() string {
 // BuildSecretPath constructs the OCI secret name based on request labels and service information
 func (o *OCIProvider) BuildSecretPath(req secrets.Request) string {
 	// Use custom name from labels if provided
-	if customPath, exists := req.SecretLabels["oci_secret_name"]; exists {
+	if customPath := secretLabel(req.SecretLabels, "oci_secret_name"); customPath != "" {
 		return customPath
 	}
 	// Default naming convention
@@ -253,14 +253,23 @@ type VersionStage struct{ Version int64 }
 func (NamedStage) secretStage() {
 	// sealed interface marker — prevents external implementations of SecretStager
 }
+
 func (VersionStage) secretStage() {
 	// sealed interface marker — prevents external implementations of SecretStager
+}
+
+func secretLabel(labels map[string]string, key string) string {
+	if labels == nil {
+		return ""
+	}
+	return strings.TrimSpace(labels[key])
 }
 
 // resolveStage parses the oci_stage label into a SecretStager.
 // Accepts named stages (current, previous, latest, pending, deprecated) or a numeric version (e.g. "3").
 // Returns NamedStage{"CURRENT"} when the label is empty or unset.
 func resolveStage(label string) (SecretStager, error) {
+	label = strings.TrimSpace(label)
 	if label == "" {
 		return NamedStage{Name: "CURRENT"}, nil
 	}
