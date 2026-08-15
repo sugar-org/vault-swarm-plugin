@@ -264,6 +264,11 @@
       "settable": ["value"]
     },
     {
+      "name": "OCI_ENDPOINT",
+      "description": "OCI API endpoint override (e.g. floci-oci http://localhost:4599)",
+      "settable": ["value"]
+    },
+    {
       "name": "ENABLE_MONITORING",
       "description": "Enable Monitoring secret rotation (true/false) default true",
       "settable": ["value"]

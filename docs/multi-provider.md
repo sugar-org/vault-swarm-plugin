@@ -162,6 +162,7 @@ OCI Vault supports two authentication methods: API key (default) and instance pr
 | `OCI_PRIVATE_KEY` | Base64-encoded PEM private key (required for `api_key`) | — |
 | `OCI_PRIVATE_KEY_PASSPHRASE` | Private key passphrase (only if key is encrypted) | — |
 | `OCI_VAULT_OCID` | Vault OCID (required for name-based lookups) | — |
+| `OCI_ENDPOINT` | API endpoint override (floci-oci: `http://localhost:4599`) | regional OCI endpoint |
 
 
 **Private Key Encoding:**

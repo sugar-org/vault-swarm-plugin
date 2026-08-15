@@ -32,6 +32,7 @@ type OCIConfig struct {
 	PrivateKeyPassphrase string
 	VaultOCID            string
 	AuthMethod           string // "api_key", "instance_principal"
+	Endpoint             string // optional override, e.g. floci-oci http://localhost:4599
 }
 
 // Initialize sets up the OCI provider with the given configuration
@@ -45,6 +46,7 @@ func (o *OCIProvider) Initialize(config map[string]string) error {
 		PrivateKeyPassphrase: config["OCI_PRIVATE_KEY_PASSPHRASE"],
 		VaultOCID:            config["OCI_VAULT_OCID"],
 		AuthMethod:           utils.GetConfigOrDefault(config, "OCI_AUTH_METHOD", "api_key"),
+		Endpoint:             utils.GetConfigOrDefault(config, "OCI_ENDPOINT", ""),
 	}
 
 	// Build the configuration provider based on auth method
@@ -63,9 +65,15 @@ func (o *OCIProvider) Initialize(config map[string]string) error {
 	if o.config.Region != "" {
 		client.SetRegion(o.config.Region)
 	}
+	if o.config.Endpoint != "" {
+		client.Host = o.config.Endpoint
+	}
 
 	o.client = client
-
+	if o.config.Endpoint != "" {
+		log.Infof("Successfully initialized OCI Vault provider (auth_method=%s, endpoint=%s)", o.config.AuthMethod, o.config.Endpoint)
+		return nil
+	}
 	log.Infof("Successfully initialized OCI Vault provider (auth_method=%s, region=%s)", o.config.AuthMethod, o.config.Region)
 	return nil
 }

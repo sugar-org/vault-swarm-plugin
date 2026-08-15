@@ -76,7 +76,7 @@ func GetProviderInfo(providerType string) (map[string]string, error) {
 		info["name"] = "OCI Vault"
 		info["description"] = "Oracle Cloud Infrastructure Vault"
 		info["auth_methods"] = "api_key, instance_principal"
-		info["env_vars"] = "OCI_REGION, OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT, OCI_PRIVATE_KEY, OCI_PRIVATE_KEY_PASSPHRASE, OCI_VAULT_OCID, OCI_AUTH_METHOD"
+		info["env_vars"] = "OCI_REGION, OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT, OCI_PRIVATE_KEY, OCI_PRIVATE_KEY_PASSPHRASE, OCI_VAULT_OCID, OCI_AUTH_METHOD, OCI_ENDPOINT"
 
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)
