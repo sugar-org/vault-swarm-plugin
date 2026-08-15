@@ -55,7 +55,7 @@ jobs:
       - name: Init Docker Swarm
         run: docker swarm init
 
-      # Kumo is a lightweight open-source AWS emulator started by the smoke test
+      # Floci is a lightweight open-source AWS emulator started by the smoke test
       # itself, so no LocalStack auth token / license is required. The aws CLI is
       # preinstalled on ubuntu-latest runners.
       - name: Run smoke test for awssm

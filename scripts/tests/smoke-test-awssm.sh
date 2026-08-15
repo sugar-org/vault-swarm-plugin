@@ -7,13 +7,14 @@ REPO_ROOT="${GITHUB_WORKSPACE:-$(realpath -- "${SCRIPT_DIR}/../..")}"
 source "${SCRIPT_DIR}/smoke-test-helper.sh"
 
 # Configuration
-# Kumo is a lightweight open-source AWS emulator (https://github.com/sivchari/kumo).
-# It speaks the AWS Secrets Manager API on port 4566 and needs no auth token,
-# so the smoke test is reproducible for contributors, forks, and external PRs.
-KUMO_CONTAINER="smoke-kumo"
-# Pinned to an immutable digest (0.26.0) for reproducible CI; multi-arch (amd64/arm64).
-KUMO_IMAGE="ghcr.io/sivchari/kumo:0.26.0@sha256:e63054fbe10eb17b0c9142e937e11b3f4ee2709ac1c80035f3220542f3e5b045"
-KUMO_ENDPOINT="http://localhost:4566"
+# Floci is a lightweight open-source AWS emulator (https://floci.io, https://github.com/floci-io/floci).
+# It is a drop-in LocalStack replacement: same port 4566, same wire protocol, and
+# needs no auth token, so the smoke test is reproducible for contributors, forks,
+# and external PRs.
+FLOCI_CONTAINER="smoke-floci"
+# Pinned to an immutable digest (1.6.0) for reproducible CI; multi-arch (amd64/arm64).
+FLOCI_IMAGE="floci/floci:1.6.0@sha256:eab36252ea43a4a73928423f0372219052c5c6f87207f6c4754db14b91d6ed30"
+AWS_ENDPOINT="http://localhost:4566"
 AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="test"
 AWS_SECRET_ACCESS_KEY="test"
@@ -25,13 +26,13 @@ SECRET_VALUE="awssm-smoke-pass-v1"
 SECRET_VALUE_ROTATED="awssm-smoke-pass-v2"
 COMPOSE_FILE="${SCRIPT_DIR}/smoke-awssm-compose.yml"
 
-# Helper to run the AWS CLI against the Kumo endpoint. Kumo needs no real
+# Helper to run the AWS CLI against the floci endpoint. Floci needs no real
 # credentials, but the CLI still requires values to sign the request.
 aws_cmd() {
     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
     AWS_DEFAULT_REGION="${AWS_REGION}" \
-    aws --no-cli-pager --endpoint-url "${KUMO_ENDPOINT}" "$@"
+    aws --no-cli-pager --endpoint-url "${AWS_ENDPOINT}" "$@"
 }
 
 # Cleanup trap
@@ -39,9 +40,9 @@ cleanup() {
     echo -e "${RED}Running AWS Secrets Manager smoke test cleanup...${DEF}"
     remove_stack "${STACK_NAME}"
     docker secret rm "${SECRET_NAME}" 2>/dev/null || true
-    if [[ -n "${KUMO_CONTAINER}" ]]; then
-        docker stop "${KUMO_CONTAINER}" 2>/dev/null || true
-        docker rm   "${KUMO_CONTAINER}" 2>/dev/null || true
+    if [[ -n "${FLOCI_CONTAINER}" ]]; then
+        docker stop "${FLOCI_CONTAINER}" 2>/dev/null || true
+        docker rm   "${FLOCI_CONTAINER}" 2>/dev/null || true
     fi
     remove_plugin
 }
@@ -49,28 +50,28 @@ trap cleanup EXIT
 
 command -v aws >/dev/null 2>&1 || die "aws CLI is required to run the AWS Secrets Manager smoke test."
 
-# Start Kumo container (skip if an emulator is already serving on 4566, e.g. in CI)
+# Start floci container (skip if an emulator is already serving on 4566, e.g. in CI)
 if aws_cmd secretsmanager list-secrets >/dev/null 2>&1; then
     info "AWS emulator already running on 4566, skipping container start."
-    KUMO_CONTAINER=""
+    FLOCI_CONTAINER=""
 else
-    info "Starting Kumo AWS emulator container..."
+    info "Starting floci AWS emulator container..."
     docker run -d \
-        --name "${KUMO_CONTAINER}" \
+        --name "${FLOCI_CONTAINER}" \
         -p 4566:4566 \
-        "${KUMO_IMAGE}"
+        "${FLOCI_IMAGE}"
 fi
 
-# Wait for Kumo to be ready. Kumo has no dedicated health endpoint, so we probe
-# the Secrets Manager API directly until it answers.
-info "Waiting for Kumo to be ready..."
+# Wait for floci to be ready. Floci's /_localstack/health response shape differs
+# from LocalStack's, so we probe the Secrets Manager API directly until it answers.
+info "Waiting for floci to be ready..."
 elapsed=0
 until aws_cmd secretsmanager list-secrets >/dev/null 2>&1; do
     sleep 2
     elapsed=$((elapsed + 2))
-    [[ "${elapsed}" -lt 60 ]] || die "Kumo did not become ready within 60s."
+    [[ "${elapsed}" -lt 60 ]] || die "floci did not become ready within 60s."
 done
-success "Kumo is ready."
+success "floci is ready."
 
 # Write test secret
 info "Writing test secret to AWS Secrets Manager..."
@@ -89,7 +90,7 @@ docker plugin set "${PLUGIN_NAME}" \
     AWS_REGION="${AWS_REGION}" \
     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-    AWS_ENDPOINT_URL="${KUMO_ENDPOINT}" \
+    AWS_ENDPOINT_URL="${AWS_ENDPOINT}" \
     ENABLE_ROTATION="true" \
     ROTATION_INTERVAL="10s" \
     ENABLE_MONITORING="false"
