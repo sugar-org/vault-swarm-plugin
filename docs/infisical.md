@@ -115,9 +115,9 @@ Universal Auth access tokens are cached in-process and refreshed before expiry (
 
 End-to-end Swarm smoke coverage (fetch + rotation) lives in `scripts/tests/smoke-test-infisical.sh`.
 
-This test talks to a **real Infisical project** (free cloud account is fine). There is no mock server.
+This test talks to a **real Infisical project** when credentials are set (free cloud account is fine). If they are missing — typical for fork PRs — it starts `scripts/tests/mock-infisical-server` and points the plugin at localhost, same as the Doppler smoke test.
 
-Required:
+Real-mode required:
 
 | Variable | Description |
 |---|---|

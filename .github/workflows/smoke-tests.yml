@@ -22,8 +22,10 @@ jobs:
         run: docker swarm init
 
       - name: Run smoke test for ${{ matrix.provider }}
-        # Infisical vars are only consumed by the infisical script (real account;
-        # no mock). Ignored by the other providers.
+        # Infisical vars are only consumed by the infisical script: it uses a
+        # real account when INFISICAL_PROJECT_ID + auth are set (same-repo
+        # runs) and otherwise falls back to the local Go mock server.
+        # Ignored by the other providers.
         env:
           INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
           INFISICAL_SMOKE_TOKEN: ${{ secrets.INFISICAL_SMOKE_TOKEN }}

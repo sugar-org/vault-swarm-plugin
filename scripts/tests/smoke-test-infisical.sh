@@ -1,20 +1,13 @@
 #!/usr/bin/env bash
-# Infisical smoke test — real Infisical account only (no mock server).
+# Infisical smoke test.
 #
-# Required env (free Infisical cloud / self-hosted project works):
-#   INFISICAL_PROJECT_ID
-#   and either:
-#     INFISICAL_SMOKE_TOKEN
-#   or:
-#     INFISICAL_SMOKE_CLIENT_ID + INFISICAL_SMOKE_CLIENT_SECRET
+# Backend selection (same idea as smoke-test-doppler.sh):
+#   - If INFISICAL_PROJECT_ID is set and auth is present, run against real
+#     Infisical (app.infisical.com or INFISICAL_SITE_URL).
+#   - Otherwise, fall back to the local Go mock server (no account needed).
 #
-# Optional:
-#   INFISICAL_ENVIRONMENT   (default: dev)
-#   INFISICAL_SECRET_PATH   (default: /)
-#   INFISICAL_SITE_URL      (default: https://app.infisical.com)
-#
-# Machine identity / token must be able to create, read, update, and delete
-# secrets in the target project/environment.
+# Real-mode auth is either INFISICAL_SMOKE_TOKEN, or
+# INFISICAL_SMOKE_CLIENT_ID + INFISICAL_SMOKE_CLIENT_SECRET.
 
 set -ex
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -30,6 +23,8 @@ export INFISICAL_PROJECT_ID="${INFISICAL_PROJECT_ID:-}"
 export INFISICAL_SMOKE_TOKEN="${INFISICAL_SMOKE_TOKEN:-}"
 export INFISICAL_SMOKE_CLIENT_ID="${INFISICAL_SMOKE_CLIENT_ID:-}"
 export INFISICAL_SMOKE_CLIENT_SECRET="${INFISICAL_SMOKE_CLIENT_SECRET:-}"
+export INFISICAL_MOCK_URL="http://127.0.0.1:18081"
+export INFISICAL_MOCK_TOKEN="infisical-smoke-token"
 
 STACK_NAME="smoke-infisical"
 SECRET_NAME="smoke_secret"
@@ -44,19 +39,30 @@ SECRET_VALUE="infisical-smoke-pass-v1-${RUN_ID}"
 SECRET_VALUE_ROTATED="infisical-smoke-pass-v2-${RUN_ID}"
 
 INFISICAL_ACCESS_TOKEN=""
+INFISICAL_MODE=""
+MOCK_SERVER_PID=""
 EXIT_CODE=0
 
-infisical_require_creds() {
-    if [[ -z "${INFISICAL_PROJECT_ID}" ]]; then
-        die "INFISICAL_PROJECT_ID is required (create a free Infisical project and export it)."
+infisical_has_real_creds() {
+    [[ -n "${INFISICAL_PROJECT_ID}" ]] || return 1
+    [[ -n "${INFISICAL_SMOKE_TOKEN}" ]] && return 0
+    [[ -n "${INFISICAL_SMOKE_CLIENT_ID}" && -n "${INFISICAL_SMOKE_CLIENT_SECRET}" ]] && return 0
+    return 1
+}
+
+infisical_init_backend() {
+    if infisical_has_real_creds; then
+        INFISICAL_MODE="real"
+    else
+        INFISICAL_MODE="mock"
+        INFISICAL_PROJECT_ID="smoke-project"
+        INFISICAL_SMOKE_TOKEN="${INFISICAL_MOCK_TOKEN}"
+        INFISICAL_SITE_URL="${INFISICAL_MOCK_URL}"
+        INFISICAL_SMOKE_CLIENT_ID=""
+        INFISICAL_SMOKE_CLIENT_SECRET=""
     fi
-    if [[ -n "${INFISICAL_SMOKE_TOKEN}" ]]; then
-        return 0
-    fi
-    if [[ -n "${INFISICAL_SMOKE_CLIENT_ID}" && -n "${INFISICAL_SMOKE_CLIENT_SECRET}" ]]; then
-        return 0
-    fi
-    die "Set INFISICAL_SMOKE_TOKEN, or INFISICAL_SMOKE_CLIENT_ID + INFISICAL_SMOKE_CLIENT_SECRET (free Infisical account)."
+    export INFISICAL_MODE INFISICAL_PROJECT_ID INFISICAL_SMOKE_TOKEN INFISICAL_SITE_URL
+    return 0
 }
 
 # Extract a JSON string field value (first match). Smoke values/tokens have no embedded quotes.
@@ -203,6 +209,10 @@ cleanup() {
     if [[ -n "${INFISICAL_ACCESS_TOKEN}" ]]; then
         infisical_delete_secret "${SECRET_KEY}"
     fi
+    if [[ -n "${MOCK_SERVER_PID}" ]]; then
+        kill "${MOCK_SERVER_PID}" 2>/dev/null || true
+        wait "${MOCK_SERVER_PID}" 2>/dev/null || true
+    fi
     rm -f "${COMPOSE_FILE}"
     remove_plugin
     # Preserve the first non-zero status (e.g. die/set -e), else EXIT_CODE.
@@ -213,9 +223,26 @@ cleanup() {
 }
 trap cleanup EXIT
 
-infisical_require_creds
+infisical_init_backend
 infisical_login
-info "Infisical smoke test against ${INFISICAL_SITE_URL} (project=${INFISICAL_PROJECT_ID}, env=${INFISICAL_ENVIRONMENT})."
+info "Infisical smoke test running in '${INFISICAL_MODE}' mode against ${INFISICAL_SITE_URL} (project=${INFISICAL_PROJECT_ID}, env=${INFISICAL_ENVIRONMENT})."
+
+if [[ "${INFISICAL_MODE}" == "mock" ]]; then
+    info "Starting Infisical API mock server..."
+    go run "${REPO_ROOT}/scripts/tests/mock-infisical-server" --token "${INFISICAL_MOCK_TOKEN}" &
+    MOCK_SERVER_PID=$!
+
+    elapsed=0
+    until curl -sS -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer ${INFISICAL_MOCK_TOKEN}" \
+        "${INFISICAL_MOCK_URL}/api/v4/secrets/__ready?projectId=${INFISICAL_PROJECT_ID}&environment=${INFISICAL_ENVIRONMENT}&secretPath=${INFISICAL_SECRET_PATH}&viewSecretValue=true" \
+        | grep -q '404'; do
+        sleep 1
+        elapsed=$((elapsed + 1))
+        [[ "${elapsed}" -lt 15 ]] || die "Infisical mock server did not become ready within 15s."
+    done
+    success "Infisical mock server is ready."
+fi
 
 write_infisical_compose "${COMPOSE_FILE}" "${SECRET_NAME}" "${SECRET_KEY}"
 
