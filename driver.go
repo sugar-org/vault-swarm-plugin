@@ -16,6 +16,7 @@ import (
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/sugar-org/swarm-external-secrets/internal/secrettransform"
 	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 	"github.com/sugar-org/swarm-external-secrets/monitoring"
 	"github.com/sugar-org/swarm-external-secrets/providers"
@@ -26,6 +27,7 @@ type SecretsDriver struct {
 	provider      providers.SecretsProvider
 	config        *SecretsConfig
 	dockerClient  *dockerclient.Client
+	transformer   secrettransform.Transformer      // aws kms service which decrypts ciphertexts
 	secretTracker map[string]*providers.SecretInfo // key: docker secret name
 	trackerMutex  sync.RWMutex
 	monitorCtx    context.Context
@@ -95,6 +97,7 @@ func NewDriver() (*SecretsDriver, error) {
 		provider:      provider,
 		config:        config,
 		dockerClient:  dockerClient,
+		transformer:   secrettransform.NewAWSKMSTransformer(settings),
 		secretTracker: make(map[string]*providers.SecretInfo),
 		monitorCtx:    monitorCtx,
 		monitorCancel: monitorCancel,
@@ -173,12 +176,20 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 		}
 	}
 
-	log.Debugf("Successfully retrieved secret from %s provider", d.provider.GetProviderName())
-
 	// Track this secret for monitoring if rotation is enabled
 	if d.config.EnableRotation && d.provider.SupportsRotation() {
 		d.trackSecret(secretInfo, value)
 	}
+
+	value, err = d.transformSecret(ctx, secretInfo, value)
+	if err != nil {
+		log.Errorf("Error transforming secret %s: %v", req.SecretName, err)
+		return secrets.Response{
+			Err: fmt.Sprintf("failed to transform secret: %v", err),
+		}
+	}
+
+	log.Debugf("Successfully retrieved secret from %s provider", d.provider.GetProviderName())
 
 	// Determine if secret should be reusable (Docker DoNotReuse=true means do not cache/reuse)
 	doNotReuse := d.shouldNotReuse(req)
@@ -189,6 +200,19 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 		Value:      value,
 		DoNotReuse: doNotReuse,
 	}
+}
+
+func (d *SecretsDriver) transformSecret(ctx context.Context, secretInfo *providers.SecretInfo, value []byte) ([]byte, error) {
+	if d.transformer == nil {
+		return value, nil
+	}
+
+	transformed, err := d.transformer.Transform(ctx, secretInfo, value)
+	if err != nil {
+		return nil, fmt.Errorf("transform secret value: %w", err)
+	}
+
+	return transformed, nil
 }
 
 // shouldNotReuse returns the value for secrets.Response.DoNotReuse.
@@ -350,9 +374,14 @@ func (d *SecretsDriver) rotateSecret(secretInfo *providers.SecretInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	newValue, err := d.provider.GetSecret(ctx, secretInfo)
+	providerValue, err := d.provider.GetSecret(ctx, secretInfo)
 	if err != nil {
 		return fmt.Errorf("failed to get updated secret from provider: %v", err)
+	}
+
+	newValue, err := d.transformSecret(ctx, secretInfo, providerValue)
+	if err != nil {
+		return fmt.Errorf("failed to transform updated secret: %w", err)
 	}
 
 	// Update Docker secret (this now handles service updates internally)
@@ -362,7 +391,7 @@ func (d *SecretsDriver) rotateSecret(secretInfo *providers.SecretInfo) error {
 
 	// Update tracking information
 	d.trackerMutex.Lock()
-	secretInfo.LastHash = fmt.Sprintf("%x", sha256.Sum256(newValue))
+	secretInfo.LastHash = fmt.Sprintf("%x", sha256.Sum256(providerValue))
 	secretInfo.LastUpdated = time.Now()
 	d.trackerMutex.Unlock()
 

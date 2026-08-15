@@ -129,6 +129,11 @@
       "settable": ["value"]
     },
     {
+      "name": "AWS_KMS_ENDPOINT",
+      "description": "AWS KMS endpoint URL (optional override, e.g. for LocalStack)",
+      "settable": ["value"]
+    },
+    {
       "name": "AZURE_VAULT_URL",
       "description": "Azure Key Vault URL",
       "settable": ["value"]
