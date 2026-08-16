@@ -1,0 +1,72 @@
+name: OCI Floci Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, alpha/provider-integration, feat/oci-provider]
+
+jobs:
+  # AWS-style: start the emulator and exercise Vault + KMS crypto + secret
+  # bundles with curl (no plugin build). See
+  # https://floci.io/floci-oci/services/kms-vault/
+  oci-kms-vault-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OCI_ENDPOINT: http://localhost:4599
+      OCI_TENANCY_OCID: ocid1.tenancy.oc1..flocilocaltenancy0000000000000000000000000000000000000000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Start floci-oci
+        run: |
+          docker compose -f scripts/tests/floci-oci-compose.yml up -d
+          elapsed=0
+          until curl -sf http://localhost:4599/_floci-oci/health >/dev/null 2>&1; do
+            sleep 2
+            elapsed=$((elapsed + 2))
+            if [[ "${elapsed}" -ge 30 ]]; then
+              echo "floci-oci did not become healthy within 30s"
+              docker compose -f scripts/tests/floci-oci-compose.yml logs
+              exit 1
+            fi
+          done
+          echo "floci-oci is ready."
+
+      - name: Verify OCI KMS Vault + Secrets roundtrip
+        run: bash scripts/tests/floci-oci-roundtrip.sh
+
+      - name: floci-oci logs
+        if: failure()
+        run: docker compose -f scripts/tests/floci-oci-compose.yml logs
+
+  # Azure/GCP-style: Swarm plugin smoke against the same emulator.
+  oci-floci-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OCI_ENDPOINT: http://localhost:4599
+      OCI_REGION: us-ashburn-1
+      OCI_TENANCY_OCID: ocid1.tenancy.oc1..flocilocaltenancy0000000000000000000000000000000000000000
+      OCI_AUTH_METHOD: api_key
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Init Docker Swarm
+        run: docker swarm init
+
+      - name: Run OCI Vault smoke test
+        run: bash scripts/tests/smoke-test-oci.sh
+
+      - name: floci-oci logs
+        if: failure()
+        run: docker logs smoke-floci-oci || true

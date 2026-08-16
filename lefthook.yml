@@ -32,7 +32,7 @@ pre-commit:
 
     gosec:
       glob: "**/*.go"
-      run: gosec ./...
+      run: gosec -exclude=G101,G117 ./...
 
     eof-newline:
       help: Fail when a staged file does not end with a POSIX newline

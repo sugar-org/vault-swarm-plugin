@@ -88,16 +88,41 @@ build_plugin() {
 
 # Enable plugin (mirrors test.sh pattern)
 enable_plugin() {
+    # config.json bind-mounts host /run/swarm-external-secrets into the plugin.
+    # Docker refuses to enable if that host path does not exist.
+    ensure_plugin_mount_dir
+
     echo -e "${RED}Set plugin permissions${DEF}"
     docker plugin set "${PLUGIN_NAME}" gid=0 uid=0
 
     echo -e "${RED}Enable the plugin${DEF}"
-    docker plugin enable "${PLUGIN_NAME}"
+    if ! docker plugin enable "${PLUGIN_NAME}"; then
+        error "Failed to enable plugin '${PLUGIN_NAME}'"
+        docker plugin inspect "${PLUGIN_NAME}" 2>/dev/null || true
+        docker_daemon_logs
+        die "docker plugin enable failed (plugin process likely exited before creating plugin.sock)"
+    fi
 
     echo -e "${RED}Check plugin status${DEF}"
     docker plugin ls
 
     success "Plugin enabled."
+}
+
+ensure_plugin_mount_dir() {
+    local dir="/run/swarm-external-secrets"
+    if [[ -d "${dir}" ]]; then
+        return 0
+    fi
+    info "Creating plugin mount source ${dir}..."
+    # Directory only needs to exist for the bind mount; Docker daemon is root.
+    if [[ "$(id -u)" -eq 0 ]]; then
+        mkdir -p "${dir}"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo mkdir -p "${dir}"
+    else
+        die "Need ${dir} for plugin bind mount (create it as root)."
+    fi
 }
 # Remove plugin (mirrors cleanup.sh pattern)
 remove_plugin() {

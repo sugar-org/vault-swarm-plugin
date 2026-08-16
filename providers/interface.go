@@ -5,19 +5,12 @@ import (
 	"time"
 
 	"github.com/docker/go-plugins-helpers/secrets"
+
+	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
 
 // SecretInfo tracks information about secrets being managed
-type SecretInfo struct {
-	DockerSecretName string
-	SecretPath       string
-	SecretField      string
-	ServiceNames     []string
-	LastHash         string // Hash of the secret value for change detection
-	LastUpdated      time.Time
-	Provider         string            // Which provider manages this secret
-	Labels           map[string]string // Original request labels, used to reconstruct requests for rotation
-}
+type SecretInfo = utils.SecretInfo
 
 // SecretsProvider defines the interface that all secret providers must implement
 type SecretsProvider interface {

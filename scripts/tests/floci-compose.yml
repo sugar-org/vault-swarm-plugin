@@ -1,0 +1,5 @@
+services:
+  floci:
+    image: floci/floci:1.6.0@sha256:eab36252ea43a4a73928423f0372219052c5c6f87207f6c4754db14b91d6ed30
+    ports:
+      - "4566:4566"

@@ -1,0 +1,48 @@
+name: AWS Floci Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, alpha/provider-integration]
+
+jobs:
+  aws-floci-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT_URL: http://localhost:4566
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The floci native image ships no shell tools, so readiness is probed
+      # from the runner via the LocalStack-compatible health endpoint.
+      - name: Start Floci
+        run: |
+          docker compose -f scripts/tests/floci-compose.yml up -d
+          elapsed=0
+          until curl -sf http://localhost:4566/_localstack/health >/dev/null 2>&1; do
+            sleep 2
+            elapsed=$((elapsed + 2))
+            if [[ "${elapsed}" -ge 30 ]]; then
+              echo "Floci did not become healthy within 30s"
+              docker compose -f scripts/tests/floci-compose.yml logs
+              exit 1
+            fi
+          done
+          echo "Floci is ready."
+
+      # Exercises the same KMS encrypt -> Secrets Manager -> KMS decrypt flow
+      # the plugin's secret transformation performs (internal/secrettransform),
+      # including rotation via put-secret-value.
+      - name: Verify AWS KMS + Secrets Manager roundtrip
+        run: bash scripts/tests/floci-kms-roundtrip.sh
+
+      - name: Floci logs
+        if: failure()
+        run: docker compose -f scripts/tests/floci-compose.yml logs

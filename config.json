@@ -2,7 +2,7 @@
   "description": "External secrets plugin for Docker Swarm",
   "documentation": "https://docs.docker.com/engine/extend/",
   "interface": {
-    "types": ["docker.secretdriver/1.0","docker.secretprovider/1.0"],
+    "types": ["docker.secretdriver/1.0", "docker.secretprovider/1.0"],
     "socket": "plugin.sock"
   },
   "entrypoint": ["./swarm-external-secrets"],
@@ -54,13 +54,38 @@
       "settable": ["value"]
     },
     {
+      "name": "VAULT_APPROLE_AUTH_PATH",
+      "description": "Vault AppRole auth mount path",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_ROLE",
+      "description": "Vault JWT auth role",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT",
+      "description": "Vault JWT auth token",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_FILE",
+      "description": "Path to a Vault JWT auth token file",
+      "settable": ["value"]
+    },
+    {
+      "name": "VAULT_JWT_AUTH_PATH",
+      "description": "Vault JWT auth mount path",
+      "settable": ["value"]
+    },
+    {
       "name": "VAULT_MOUNT_PATH",
       "description": "Vault mount path",
       "settable": ["value"]
     },
     {
       "name": "SECRETS_PROVIDER",
-      "description": "Secrets provider type (e.g., vault, openbao)",
+      "description": "Secrets provider type (e.g., vault, aws, azure, openbao, oci)",
       "settable": ["value"]
     },
     {
@@ -81,6 +106,31 @@
     {
       "name": "OPENBAO_SECRET_ID",
       "description": "OpenBao AppRole secret ID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_APPROLE_AUTH_PATH",
+      "description": "OpenBao AppRole auth mount path",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_ROLE",
+      "description": "OpenBao JWT auth role",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT",
+      "description": "OpenBao JWT auth token",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_FILE",
+      "description": "Path to an OpenBao JWT auth token file",
+      "settable": ["value"]
+    },
+    {
+      "name": "OPENBAO_JWT_AUTH_PATH",
+      "description": "OpenBao JWT auth mount path",
       "settable": ["value"]
     },
     {
@@ -129,6 +179,11 @@
       "settable": ["value"]
     },
     {
+      "name": "AWS_KMS_ENDPOINT",
+      "description": "AWS KMS endpoint URL (optional override, e.g. for LocalStack)",
+      "settable": ["value"]
+    },
+    {
       "name": "AZURE_VAULT_URL",
       "description": "Azure Key Vault URL",
       "settable": ["value"]
@@ -149,23 +204,88 @@
       "settable": ["value"]
     },
     {
-      "name" : "AZURE_ACCESS_TOKEN",
+      "name": "AZURE_ACCESS_TOKEN",
       "description": "Azure access token for Key Vault",
       "settable": ["value"]
     },
     {
-      "name" : "GCP_PROJECT_ID",
+      "name": "AZURE_INSECURE_HTTP",
+      "description": "Allow HTTP connections to Azure Key Vault (for local emulators like floci-az)",
+      "settable": ["value"]
+    },
+    {
+      "name": "AZURE_AUTHORITY_HOST",
+      "description": "Azure authority host URL (for local emulators like floci-az)",
+      "settable": ["value"]
+    },
+    {
+      "name": "GCP_PROJECT_ID",
       "description": "GCP project ID",
       "settable": ["value"]
     },
     {
-      "name" : "GOOGLE_APPLICATION_CREDENTIALS",
+      "name": "GOOGLE_APPLICATION_CREDENTIALS",
       "description": "Google application credentials required for GCP Secrets manager",
       "settable": ["value"]
     },
     {
-      "name" : "GCP_CREDENTIALS_JSON",
+      "name": "GCP_CREDENTIALS_JSON",
       "description": "Google credentials json required for GCP Secrets manager",
+      "settable": ["value"]
+    },
+    {
+      "name": "SECRET_MANAGER_EMULATOR_HOST",
+      "description": "GCP Secret Manager emulator host:port (floci-gcp, e.g. localhost:4588)",
+      "settable": ["value"]
+    },
+    {
+      "name": "GCP_ENDPOINT",
+      "description": "Optional GCP Secret Manager endpoint override (alias for SECRET_MANAGER_EMULATOR_HOST)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_REGION",
+      "description": "OCI region",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_TENANCY_OCID",
+      "description": "OCI tenancy OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_USER_OCID",
+      "description": "OCI user OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_FINGERPRINT",
+      "description": "OCI API key fingerprint",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_PRIVATE_KEY",
+      "description": "OCI private key (base64-encoded PEM)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_PRIVATE_KEY_PASSPHRASE",
+      "description": "OCI private key passphrase",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_VAULT_OCID",
+      "description": "OCI Vault OCID",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_AUTH_METHOD",
+      "description": "OCI authentication method (api_key, instance_principal)",
+      "settable": ["value"]
+    },
+    {
+      "name": "OCI_ENDPOINT",
+      "description": "OCI API endpoint override (e.g. floci-oci http://localhost:4599)",
       "settable": ["value"]
     },
     {
