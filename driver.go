@@ -165,7 +165,7 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 
 	if req.SecretName == "" {
 		log.Warnf("[%s] get request rejected: secret name is required", reqID)
-		log.Debugf("[%s] secret resolution completed in %s", reqID, time.Since(start))
+		log.WithField("duration", time.Since(start)).Debugf("[%s] secret resolution completed", reqID)
 		return secrets.Response{
 			Err: "secret name is required",
 		}
@@ -181,8 +181,7 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 	// Get secret from the provider
 	value, err := d.provider.GetSecret(ctx, secretInfo)
 	if err != nil {
-		log.Errorf("[%s] error getting secret from provider %s for secret %s: %v", reqID, d.provider.GetProviderName(), req.SecretName, err)
-		log.Debugf("[%s] secret resolution failed in %s", reqID, time.Since(start))
+		log.WithField("duration", time.Since(start)).Errorf("[%s] error getting secret from provider %s for secret %s: %v", reqID, d.provider.GetProviderName(), req.SecretName, err)
 		return secrets.Response{
 			Err: fmt.Sprintf("failed to get secret: %v", err),
 		}
@@ -207,7 +206,7 @@ func (d *SecretsDriver) Get(req secrets.Request) secrets.Response {
 	doNotReuse := d.shouldNotReuse(req)
 	log.Debugf("[%s] get secret %q: DoNotReuse=%v (Swarm may reuse cached value when false)", reqID, req.SecretName, doNotReuse)
 
-	log.Debugf("[%s] successfully returning secret value in %s", reqID, time.Since(start))
+	log.WithField("duration", time.Since(start)).Debugf("[%s] successfully returning secret value", reqID)
 	return secrets.Response{
 		Value:      value,
 		DoNotReuse: doNotReuse,
