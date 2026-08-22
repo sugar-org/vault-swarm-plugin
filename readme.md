@@ -4,7 +4,7 @@
 ---
 
 
-A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, and OCI Vault.
+A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, OCI Vault, and Infisical.
 
 ### 🚀 Updates
 
@@ -28,7 +28,7 @@ Please refer to the [docs](https://sugar-org.github.io/swarm-external-secrets/) 
 
 ## Features
 
-- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, OCI Vault
+- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, OCI Vault, Infisical
 - **Multiple Auth Methods**: Support for various authentication methods per provider
 - **Automatic Secret Rotation**: Monitor providers for changes and automatically update Docker secrets and services
 - **Real-time Monitoring**: Web dashboard with system metrics, health status, and performance tracking
@@ -55,6 +55,9 @@ docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="openbao"
 
 # OCI Vault
 docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="oci"
+
+# Infisical
+docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="infisical"
 ```
 
 For multi-instance usage (for example, Vault + OpenBao with separate plugin names in Swarm), see [`docs/multi-provider.md`](./docs/multi-provider.md).
@@ -173,6 +176,7 @@ docker plugin set swarm-external-secrets:latest \
 | Azure Key Vault | ✅ Stable | Service Principal, Access Token | ✅ |
 | OpenBao | ✅ Stable | Token, AppRole | ✅ |
 | OCI Vault | 🚧 Beta | API Key, Instance Principal | ✅ |
+| Infisical | ✅ Stable | Universal Auth, Access Token | ✅ |
 | GCP Secret Manager | 🚧 Placeholder | - | - |
 
 ## Quick Start Examples
