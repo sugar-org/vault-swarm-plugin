@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/docker/go-plugins-helpers/secrets"
 	infisical "github.com/infisical/go-sdk"
@@ -14,9 +15,10 @@ import (
 )
 
 const (
-	defaultInfisicalSiteURL = "https://app.infisical.com"
-	defaultInfisicalEnv     = "dev"
-	defaultInfisicalPath    = "/"
+	defaultInfisicalSiteURL  = "https://app.infisical.com"
+	defaultInfisicalEnv      = "dev"
+	defaultInfisicalPath     = "/"
+	infisicalRetrieveTimeout = 30 * time.Second
 )
 
 // InfisicalProvider implements SecretsProvider for Infisical.
@@ -93,6 +95,11 @@ func (p *InfisicalProvider) GetSecret(ctx context.Context, secretInfo *SecretInf
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, infisicalRetrieveTimeout)
+		defer cancel()
+	}
 
 	secretName := p.resolveSecretName(secretInfo)
 	projectID, environment, secretPath := p.parseSecretPath(secretInfo.SecretPath)
@@ -100,18 +107,40 @@ func (p *InfisicalProvider) GetSecret(ctx context.Context, secretInfo *SecretInf
 	log.Debugf("Reading secret from Infisical: %s (project=%s, env=%s, path=%s)",
 		secretName, projectID, environment, secretPath)
 
-	secret, err := p.client.Secrets().Retrieve(infisical.RetrieveSecretOptions{
-		SecretKey:              secretName,
-		ProjectID:              projectID,
-		Environment:            environment,
-		SecretPath:             secretPath,
-		ExpandSecretReferences: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve Infisical secret: %w", err)
+	// go-sdk Retrieve has no context argument. Race it against ctx so the
+	// driver timeout can return; the HTTP call may still finish in the background.
+	type retrieveResult struct {
+		value string
+		err   error
+	}
+	done := make(chan retrieveResult, 1)
+	go func() {
+		secret, err := p.client.Secrets().Retrieve(infisical.RetrieveSecretOptions{
+			SecretKey:              secretName,
+			ProjectID:              projectID,
+			Environment:            environment,
+			SecretPath:             secretPath,
+			ExpandSecretReferences: true,
+		})
+		if err != nil {
+			done <- retrieveResult{err: err}
+			return
+		}
+		done <- retrieveResult{value: secret.SecretValue}
+	}()
+
+	var secretValue string
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("failed to retrieve Infisical secret: %w", ctx.Err())
+	case res := <-done:
+		if res.err != nil {
+			return nil, fmt.Errorf("failed to retrieve Infisical secret: %w", res.err)
+		}
+		secretValue = res.value
 	}
 
-	extracted, err := ExtractSecretValue(secret.SecretValue, secretInfo.SecretField)
+	extracted, err := ExtractSecretValue(secretValue, secretInfo.SecretField)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract secret value: %w", err)
 	}
@@ -209,8 +238,8 @@ func validateInfisicalSiteURL(raw string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid INFISICAL_SITE_URL: %w", err)
 	}
-	if parsed.Scheme != "https" && parsed.Scheme != "http" {
-		return "", fmt.Errorf("INFISICAL_SITE_URL must use http or https scheme")
+	if parsed.Scheme != "https" {
+		return "", fmt.Errorf("INFISICAL_SITE_URL must use https scheme")
 	}
 	if parsed.Host == "" {
 		return "", fmt.Errorf("INFISICAL_SITE_URL must include a host")

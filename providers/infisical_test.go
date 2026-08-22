@@ -3,13 +3,16 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/go-plugins-helpers/secrets"
+	infisical "github.com/infisical/go-sdk"
 )
 
 func TestInfisicalProviderInitialize(t *testing.T) {
@@ -39,7 +42,16 @@ func TestInfisicalProviderInitialize(t *testing.T) {
 				"INFISICAL_PROJECT_ID": "proj",
 				"INFISICAL_SITE_URL":   "not-a-url",
 			},
-			wantErr: "INFISICAL_SITE_URL must use http or https scheme",
+			wantErr: "INFISICAL_SITE_URL must use https scheme",
+		},
+		{
+			name: "http site url",
+			config: map[string]string{
+				"INFISICAL_TOKEN":      "st.example",
+				"INFISICAL_PROJECT_ID": "proj",
+				"INFISICAL_SITE_URL":   "http://infisical.example.com",
+			},
+			wantErr: "INFISICAL_SITE_URL must use https scheme",
 		},
 	}
 
@@ -58,20 +70,26 @@ func TestInfisicalProviderInitialize(t *testing.T) {
 	}
 }
 
+func TestInfisicalProviderInitializeHTTPS(t *testing.T) {
+	t.Parallel()
+	p := &InfisicalProvider{}
+	if err := p.Initialize(map[string]string{
+		"INFISICAL_TOKEN":      "st.example",
+		"INFISICAL_PROJECT_ID": "proj",
+		"INFISICAL_SITE_URL":   "https://app.infisical.com",
+	}); err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+	defer func() { _ = p.Close() }()
+}
+
 func TestInfisicalProviderGetSecretToken(t *testing.T) {
 	t.Parallel()
 
 	server := newInfisicalTestServer(t, "", "")
 	defer server.Close()
 
-	p := &InfisicalProvider{}
-	if err := p.Initialize(map[string]string{
-		"INFISICAL_TOKEN":      "st.test",
-		"INFISICAL_PROJECT_ID": "proj-1",
-		"INFISICAL_SITE_URL":   server.URL,
-	}); err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
+	p := infisicalProviderForServer(t, server.URL, "st.test")
 	defer func() { _ = p.Close() }()
 
 	got, err := p.GetSecret(context.Background(), &SecretInfo{
@@ -93,14 +111,9 @@ func TestInfisicalProviderGetSecretUniversalAuth(t *testing.T) {
 	server := newInfisicalTestServer(t, "cid", "csecret")
 	defer server.Close()
 
-	p := &InfisicalProvider{}
-	if err := p.Initialize(map[string]string{
-		"INFISICAL_CLIENT_ID":     "cid",
-		"INFISICAL_CLIENT_SECRET": "csecret",
-		"INFISICAL_PROJECT_ID":    "proj-1",
-		"INFISICAL_SITE_URL":      server.URL,
-	}); err != nil {
-		t.Fatalf("Initialize() error = %v", err)
+	p := infisicalProviderForServer(t, server.URL, "")
+	if _, err := p.client.Auth().UniversalAuthLogin("cid", "csecret"); err != nil {
+		t.Fatalf("UniversalAuthLogin() error = %v", err)
 	}
 	defer func() { _ = p.Close() }()
 
@@ -122,14 +135,7 @@ func TestInfisicalProviderGetSecretCanceled(t *testing.T) {
 	server := newInfisicalTestServer(t, "", "")
 	defer server.Close()
 
-	p := &InfisicalProvider{}
-	if err := p.Initialize(map[string]string{
-		"INFISICAL_TOKEN":      "st.test",
-		"INFISICAL_PROJECT_ID": "proj-1",
-		"INFISICAL_SITE_URL":   server.URL,
-	}); err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
+	p := infisicalProviderForServer(t, server.URL, "st.test")
 	defer func() { _ = p.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -137,6 +143,42 @@ func TestInfisicalProviderGetSecretCanceled(t *testing.T) {
 	_, err := p.GetSecret(ctx, &SecretInfo{DockerSecretName: "x", SecretPath: "proj-1/dev/X"})
 	if err == nil {
 		t.Fatal("GetSecret() error = nil, want canceled")
+	}
+}
+
+func TestInfisicalProviderGetSecretHonorsContextDeadline(t *testing.T) {
+	t.Parallel()
+
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, "/api/v3/secrets/raw/") {
+			http.NotFound(w, r)
+			return
+		}
+		<-release
+	}))
+	defer func() {
+		close(release)
+		server.Close()
+	}()
+
+	p := infisicalProviderForServer(t, server.URL, "st.test")
+	defer func() { _ = p.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := p.GetSecret(ctx, &SecretInfo{DockerSecretName: "x", SecretPath: "proj-1/dev/X"})
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("GetSecret() error = nil, want deadline exceeded")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("GetSecret() error = %v, want context.DeadlineExceeded", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("GetSecret() returned after %v, want return on context deadline", elapsed)
 	}
 }
 
@@ -157,6 +199,30 @@ func TestInfisicalProviderBuildSecretPath(t *testing.T) {
 	})
 	if got != "proj-1/dev/MYSQL_PASSWORD" {
 		t.Fatalf("BuildSecretPath() = %q", got)
+	}
+}
+
+func infisicalProviderForServer(t *testing.T, serverURL, token string) *InfisicalProvider {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	client := infisical.NewInfisicalClient(ctx, infisical.Config{
+		SiteUrl:          serverURL,
+		SilentMode:       true,
+		AutoTokenRefresh: infisical.BoolPtr(false),
+	})
+	if token != "" {
+		client.Auth().SetAccessToken(token)
+	}
+	return &InfisicalProvider{
+		config: &InfisicalConfig{
+			ProjectID:   "proj-1",
+			Environment: "dev",
+			SecretPath:  "/",
+			SiteURL:     serverURL,
+			Token:       token,
+		},
+		client: client,
+		cancel: cancel,
 	}
 }
 

@@ -176,6 +176,7 @@ docker plugin set swarm-external-secrets:latest \
 | Azure Key Vault | ✅ Stable | Service Principal, Access Token | ✅ |
 | OpenBao | ✅ Stable | Token, AppRole | ✅ |
 | OCI Vault | 🚧 Beta | API Key, Instance Principal | ✅ |
+| Infisical | ✅ Stable | Universal Auth, Access Token | ✅ |
 | GCP Secret Manager | 🚧 Placeholder | - | - |
 
 ## Quick Start Examples
