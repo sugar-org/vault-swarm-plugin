@@ -465,8 +465,8 @@ secrets:
 - Rotation is supported
 
 ### Infisical
-- Uses the Infisical REST API (`/api/v4/secrets/{secretName}`) with Universal Auth or a bearer token
-- Machine identities authenticate via `POST /api/v1/auth/universal-auth/login`; access tokens are cached and refreshed before expiry
+- Uses the official Infisical Go SDK with Universal Auth or a bearer token
+- The SDK refreshes Universal Auth tokens; `INFISICAL_TOKEN` is used as-is
 - Supports per-secret overrides for project, environment, and folder path
 - Secret names default to the uppercased Docker secret name when `infisical_secret_name` is not set
 

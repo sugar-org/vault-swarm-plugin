@@ -9,7 +9,7 @@ The Infisical provider fetches secret values from an Infisical project/environme
 1. **Universal Auth** (recommended for production) — machine identity `Client ID` + `Client Secret`
 2. **Bearer access token** — a pre-issued Infisical access token (`INFISICAL_TOKEN`)
 
-When a Docker service requests a secret, the plugin calls Infisical's Secrets API (`GET /api/v4/secrets/{secretName}`) and returns the plaintext value to Swarm. With rotation enabled, the plugin periodically re-reads the secret and cutovers Swarm secret versions when the value changes.
+When a Docker service requests a secret, the plugin uses the official Infisical Go SDK to retrieve it and returns the plaintext value to Swarm. With rotation enabled, the plugin periodically re-reads the secret and cutovers Swarm secret versions when the value changes.
 
 ## Configuration
 
@@ -109,7 +109,7 @@ Rotation uses the same poll-based path as other providers:
 2. Every `ROTATION_INTERVAL`, it re-fetches from Infisical.
 3. On change, it creates a new Swarm secret version and updates referencing services.
 
-Universal Auth access tokens are cached in-process and refreshed before expiry (and retried once on HTTP 401).
+Universal Auth tokens are refreshed by the Infisical SDK (`AutoTokenRefresh`). A static `INFISICAL_TOKEN` is used as-is.
 
 ## Smoke test
 
@@ -140,7 +140,7 @@ The script seeds a unique secret, deploys a Swarm stack through the plugin, veri
 
 ## Implementation notes
 
-- Uses the Infisical REST API directly (no SDK dependency).
-- Login: `POST /api/v1/auth/universal-auth/login`
-- Read: `GET /api/v4/secrets/{secretName}?projectId=...&environment=...&secretPath=...`
+- Uses the official Infisical Go SDK (`github.com/infisical/go-sdk`).
+- Universal Auth: `Auth().UniversalAuthLogin`; bearer token: `Auth().SetAccessToken`.
+- Read: `Secrets().Retrieve` (SDK `GET /api/v3/secrets/raw/{secretName}`).
 - Secret path encoding for tracking: `{projectID}/{environment}[/{folders...}]/{secretName}`
