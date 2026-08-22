@@ -1,0 +1,5 @@
+services:
+  floci-oci:
+    image: floci/floci-oci:latest
+    ports:
+      - "4599:4599"

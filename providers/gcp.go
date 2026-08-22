@@ -10,6 +10,8 @@ import (
 	"github.com/docker/go-plugins-helpers/secrets"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/sugar-org/swarm-external-secrets/internal/utils"
 )
@@ -25,6 +27,9 @@ type GCPConfig struct {
 	ProjectID       string
 	CredentialsPath string
 	CredentialsJSON string
+	// EmulatorHost is host:port for a local emulator (floci-gcp). When set,
+	// the client skips Google auth and dials plaintext gRPC.
+	EmulatorHost string
 }
 
 // Initialize sets up the GCP provider with the given configuration
@@ -33,6 +38,7 @@ func (g *GCPProvider) Initialize(config map[string]string) error {
 		ProjectID:       utils.GetConfigOrDefault(config, "GCP_PROJECT_ID", ""),
 		CredentialsPath: utils.GetConfigOrDefault(config, "GOOGLE_APPLICATION_CREDENTIALS", ""),
 		CredentialsJSON: config["GCP_CREDENTIALS_JSON"],
+		EmulatorHost:    emulatorHostFromConfig(config),
 	}
 
 	if g.config.ProjectID == "" {
@@ -43,12 +49,22 @@ func (g *GCPProvider) Initialize(config map[string]string) error {
 	var client *secretmanager.Client
 	var err error
 
-	// Support multiple authentication strategies
-	if g.config.CredentialsJSON != "" {
+	switch {
+	case g.config.EmulatorHost != "":
+		// floci-gcp (and the official emulator) speak plaintext gRPC and do not
+		// validate credentials. SECRET_MANAGER_EMULATOR_HOST is the documented env.
+		log.Infof("Connecting to GCP Secret Manager emulator at %s", g.config.EmulatorHost)
+		client, err = secretmanager.NewClient(ctx,
+			option.WithEndpoint(g.config.EmulatorHost),
+			option.WithoutAuthentication(),
+			option.WithTelemetryDisabled(),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+	case g.config.CredentialsJSON != "":
 		client, err = secretmanager.NewClient(ctx, option.WithCredentialsJSON([]byte(g.config.CredentialsJSON)))
-	} else if g.config.CredentialsPath != "" {
+	case g.config.CredentialsPath != "":
 		client, err = secretmanager.NewClient(ctx, option.WithCredentialsFile(g.config.CredentialsPath))
-	} else {
+	default:
 		// Fallback to Application Default Credentials (ADC)
 		client, err = secretmanager.NewClient(ctx)
 	}
@@ -60,6 +76,16 @@ func (g *GCPProvider) Initialize(config map[string]string) error {
 
 	log.Infof("Successfully initialized GCP Secret Manager provider for project: %s", g.config.ProjectID)
 	return nil
+}
+
+func emulatorHostFromConfig(config map[string]string) string {
+	host := utils.GetConfigOrDefault(config, "SECRET_MANAGER_EMULATOR_HOST", "")
+	if host == "" {
+		host = utils.GetConfigOrDefault(config, "GCP_ENDPOINT", "")
+	}
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	return host
 }
 
 // GetSecret retrieves a secret value from GCP Secret Manager

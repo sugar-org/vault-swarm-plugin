@@ -4,7 +4,7 @@
 ---
 
 
-A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, and Infisical.
+A Docker Swarm secrets plugin that integrates with multiple secret management providers including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, OCI Vault, and Infisical.
 
 ### 🚀 Updates
 
@@ -28,7 +28,7 @@ Please refer to the [docs](https://sugar-org.github.io/swarm-external-secrets/) 
 
 ## Features
 
-- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, Infisical
+- **Multi-Provider Support**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, OpenBao, OCI Vault, Infisical
 - **Multiple Auth Methods**: Support for various authentication methods per provider
 - **Automatic Secret Rotation**: Monitor providers for changes and automatically update Docker secrets and services
 - **Real-time Monitoring**: Web dashboard with system metrics, health status, and performance tracking
@@ -52,6 +52,9 @@ docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="azure"
 
 # OpenBao
 docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="openbao"
+
+# OCI Vault
+docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="oci"
 
 # Infisical
 docker plugin set swarm-external-secrets:latest SECRETS_PROVIDER="infisical"
@@ -134,6 +137,16 @@ docker plugin set swarm-external-secrets:latest \
          openbao_field: "secret_key"
    ```
 
+   **OCI Vault:**
+   ```yaml
+   secrets:
+     db_password:
+       driver: swarm-external-secrets:latest
+       labels:
+         oci_secret_name: "my-database-password"
+         oci_field: "password"
+   ```
+
 4. Optional: enable plugin log sidecar (for `docker compose logs` visibility):
 
    On Linux, the default plugin log path is `/run/swarm-external-secrets/plugin.log`.
@@ -162,6 +175,7 @@ docker plugin set swarm-external-secrets:latest \
 | AWS Secrets Manager | ✅ Stable | IAM, Access Keys | ✅ |
 | Azure Key Vault | ✅ Stable | Service Principal, Access Token | ✅ |
 | OpenBao | ✅ Stable | Token, AppRole | ✅ |
+| OCI Vault | 🚧 Beta | API Key, Instance Principal | ✅ |
 | GCP Secret Manager | 🚧 Placeholder | - | - |
 
 ## Quick Start Examples
@@ -188,6 +202,22 @@ docker plugin set swarm-external-secrets:latest \
     SECRETS_PROVIDER="azure" \
     AZURE_VAULT_URL="https://myvault.vault.azure.net/" \
     AZURE_TENANT_ID="12345678-1234-1234-1234-123456789012"
+```
+
+### OCI Vault
+```bash
+# Base64-encode your PEM private key
+OCI_KEY=$(base64 < ~/.oci/oci_api_key.pem | tr -d '\n')
+
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="oci" \
+    OCI_AUTH_METHOD="api_key" \
+    OCI_REGION="us-ashburn-1" \
+    OCI_TENANCY_OCID="ocid1.tenancy.oc1..example" \
+    OCI_USER_OCID="ocid1.user.oc1..example" \
+    OCI_FINGERPRINT="aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99" \
+    OCI_PRIVATE_KEY="${OCI_KEY}" \
+    OCI_VAULT_OCID="ocid1.vault.oc1..example"
 ```
 
 ### License
