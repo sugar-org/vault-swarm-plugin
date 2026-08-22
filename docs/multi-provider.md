@@ -209,7 +209,77 @@ The plugin resolves which secret to fetch using the following logic:
 
 ---
 
-### 6. GCP Secret Manager (Placeholder)
+### 6. Doppler
+
+**Provider Type:** `doppler`
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+|---|---|---|
+| `DOPPLER_TOKEN` | Doppler service token or CLI token (required) | — |
+| `DOPPLER_PROJECT` | Doppler project (required for non-service tokens) | — |
+| `DOPPLER_CONFIG` | Doppler config/environment (`dev`, `stg`, `prd`) | — |
+| `DOPPLER_API_URL` | Doppler API base URL | `https://api.doppler.com` |
+| `DOPPLER_CACHE_TTL` | Cache duration for config downloads | `30s` |
+| `DOPPLER_WEBHOOK_SECRET` | Signing secret used to verify `X-Doppler-Signature` | — |
+| `DOPPLER_WEBHOOK_ENABLE` | Enable the webhook listener for event-driven rotation | `false` |
+| `DOPPLER_WEBHOOK_PORT` | Port for the webhook listener (host network) | `8081` |
+| `DOPPLER_WEBHOOK_PATH` | HTTP path for the webhook listener | `/webhooks/doppler` |
+
+**Authentication:**
+
+- **Service token (production):** `dp.st.*` tokens are scoped to a single project+config; `DOPPLER_PROJECT` and `DOPPLER_CONFIG` are optional.
+- **CLI/personal token (development):** requires `DOPPLER_PROJECT` and `DOPPLER_CONFIG`.
+
+**Example (service token):**
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="doppler" \
+    DOPPLER_TOKEN="dp.st.production.xxx" \
+    ENABLE_ROTATION="true" \
+    ROTATION_INTERVAL="30s"
+```
+
+**Example (CLI token for local development):**
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="doppler" \
+    DOPPLER_TOKEN="$(doppler configure get token --plain)" \
+    DOPPLER_PROJECT="my-api" \
+    DOPPLER_CONFIG="dev"
+```
+
+**Secret Labels:**
+
+- `doppler_secret_name` — Doppler secret key (e.g. `MYSQL_PASSWORD`)
+- `doppler_project` — Optional per-secret project override
+- `doppler_config` — Optional per-secret config override
+
+If `doppler_secret_name` is omitted, the Docker secret name is uppercased to match Doppler naming conventions (`mysql_password` → `MYSQL_PASSWORD`).
+
+**Webhooks (event-driven rotation):**
+
+Instead of only polling every `ROTATION_INTERVAL`, the plugin can rotate immediately when Doppler reports a change. Enable the listener and configure a [Doppler webhook](https://docs.doppler.com/docs/webhooks) that POSTs to it.
+
+```bash
+docker plugin set swarm-external-secrets:latest \
+    SECRETS_PROVIDER="doppler" \
+    DOPPLER_TOKEN="dp.st.production.xxx" \
+    ENABLE_ROTATION="true" \
+    DOPPLER_WEBHOOK_ENABLE="true" \
+    DOPPLER_WEBHOOK_PORT="8081" \
+    DOPPLER_WEBHOOK_SECRET="<your-signing-secret>"
+```
+
+- On a `config.secrets.update` delivery, the plugin verifies the `X-Doppler-Signature` HMAC-SHA256 header against `DOPPLER_WEBHOOK_SECRET`, drops its Doppler cache, and runs a rotation check right away.
+- The plugin runs with host networking, so the endpoint is reachable at `http://<host>:<DOPPLER_WEBHOOK_PORT><DOPPLER_WEBHOOK_PATH>`. Point the Doppler webhook (and any signing secret) at that URL.
+- Setting a signing secret is strongly recommended. Without it, requests are accepted unverified.
+- Webhook delivery is best-effort; the poll-based `ROTATION_INTERVAL` remains the safety net.
+
+---
+
+### 7. GCP Secret Manager (Placeholder)
 
 **Provider Type:** `gcp`
 
@@ -300,6 +370,24 @@ secrets:
       oci_stage: "previous"
       oci_field: "password"
 ```
+
+### Doppler
+
+```yaml
+secrets:
+  mysql_password:
+    driver: swarm-external-secrets:latest
+    labels:
+      doppler_secret_name: "MYSQL_PASSWORD"
+
+  api_key:
+    driver: swarm-external-secrets:latest
+    labels:
+      doppler_secret_name: "API_KEY"
+```
+
+For multiple Doppler configs, run separate plugin instances with different service tokens (one token per project+config), similar to the Vault + OpenBao pattern above.
+
 
 ## Multiple Providers in the Same Swarm Cluster
 
@@ -402,6 +490,13 @@ secrets:
 - Secrets can be referenced by name (`oci_secret_name`, requires a vault OCID) or by OCID (`oci_secret_ocid`)
 - The `oci_vault_ocid` label overrides the plugin-level `OCI_VAULT_OCID` per secret, allowing a single plugin instance to pull secrets from multiple vaults
 - Rotation is supported
+
+### Doppler
+- Uses the Doppler REST API (`/v3/configs/config/secrets/download`)
+- Service tokens are scoped to one project+config; use multiple plugin instances for multiple environments
+- Config downloads are cached (default 30s) to reduce API calls; the cache is dropped on a webhook event so rotation sees fresh values immediately
+- Optional webhook listener enables event-driven rotation, verified via the `X-Doppler-Signature` HMAC-SHA256 header
+- Secret names default to the uppercased Docker secret name when `doppler_secret_name` is not set
 
 ### GCP Secret Manager
 - Currently a placeholder — will error on initialization
