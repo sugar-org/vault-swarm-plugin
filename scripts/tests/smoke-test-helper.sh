@@ -96,7 +96,12 @@ enable_plugin() {
     docker plugin set "${PLUGIN_NAME}" gid=0 uid=0
 
     echo -e "${RED}Enable the plugin${DEF}"
-    docker plugin enable "${PLUGIN_NAME}"
+    if ! docker plugin enable "${PLUGIN_NAME}"; then
+        error "Failed to enable plugin '${PLUGIN_NAME}'"
+        docker plugin inspect "${PLUGIN_NAME}" 2>/dev/null || true
+        docker_daemon_logs
+        die "docker plugin enable failed (plugin process likely exited before creating plugin.sock)"
+    fi
 
     echo -e "${RED}Check plugin status${DEF}"
     docker plugin ls
